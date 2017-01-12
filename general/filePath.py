@@ -2,8 +2,8 @@ from os.path import join,dirname
 
 root_path    = join(dirname(__file__),'..')
 
-# class_name = 'danAll'
-class_name = 'laosheng'
+class_name = 'danAll'
+# class_name = 'laosheng'
 
 if class_name == 'danSource':
     base_path = 'sourceSeparation'
@@ -12,10 +12,19 @@ elif class_name == 'danAll':
     base_path = 'danAll'
     syllableTierName = 'dian'
     gmmModels_path = join(root_path, 'phoneticSimilarity', 'gmmModels/dan')
+    dnnModels_path = join(root_path, 'phoneticSimilarity', 'dnnModels/dan')
+    dnnModels_cfg_path = join(root_path, 'phoneticSimilarity',
+                              'dnnModels/dan/dnn_danAll_phraseMatching_layers_2_512.cfg')
+    dnnModels_param_path = join(root_path, 'phoneticSimilarity',
+                              'dnnModels/dan/dnn_danAll_phraseMatching_layers_2_512.param')
 elif class_name == 'laosheng':
     base_path = 'qmLonUpf/laosheng'
     syllableTierName = 'dian'
     gmmModels_path = join(root_path, 'phoneticSimilarity', 'gmmModels/laosheng')
+    dnnModels_cfg_path = join(root_path, 'phoneticSimilarity',
+                              'dnnModels/laosheng/dnn_laosheng_phraseMatching_layers_2_512.cfg')
+    dnnModels_param_path = join(root_path, 'phoneticSimilarity',
+                              'dnnModels/laosheng/dnn_laosheng_phraseMatching_layers_2_512.param')
 phonemeTierName = 'details'
 
 dataset_path = '/Users/gong/Documents/MTG document/Jingju arias/phonemeSeg/'
@@ -39,3 +48,4 @@ score_path                          = '/Users/gong/Documents/MTG document/Jingju
 score_info_file_old                 = '0. Lyrics.csv'
 score_info_file_shenqiang_banshi    = '0. Lyrics_withShenqiangBanshi.csv'
 
+dnnModels_base_path = join(root_path, 'phoneticSimilarity', 'dnnModels')

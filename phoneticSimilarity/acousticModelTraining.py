@@ -374,13 +374,13 @@ if __name__ == '__main__':
     #                           featureFilename='dic_final_feature_train_'+class_name+'.pkl',
     #                           gmmModel_path=gmmModels_path)
 
-    processAcousticModelTrainPho(class_name=class_name,
-                              syllableTierName=syllableTierName,
-                              phonemeTierName=phonemeTierName,
-                              featureFilename='dic_pho_feature_train_'+class_name+'.pkl',
-                              gmmModel_path=gmmModels_path)
+    # processAcousticModelTrainPho(class_name=class_name,
+    #                           syllableTierName=syllableTierName,
+    #                           phonemeTierName=phonemeTierName,
+    #                           featureFilename='dic_pho_feature_train_'+class_name+'.pkl',
+    #                           gmmModel_path=gmmModels_path)
 
-    """
+
     # dump feature for DNN training, with getFeature output MFCC bands
     recordings_train = getRecordingNamesSimi('TRAIN', 'laosheng')
 
@@ -407,5 +407,3 @@ if __name__ == '__main__':
 
     with gzip.open('validation_set_danAll_phraseMatching.pkl.gz', 'wb') as f:
         cPickle.dump((feature_validation, label_validation), f)
-    """
-

@@ -50,7 +50,7 @@ class ParallelLRHMM(_LRHMM):
     # def _makeNet(self):
     #     pass
 
-    def _viterbiLog(self, observations):
+    def _viterbiLog(self, observations, am='gmm'):
         '''
         Find the best state sequence (path) using viterbi algorithm - a method of dynamic programming,
         very similar to the forward-backward algorithm, with the added step of maximization and eventual
@@ -63,7 +63,11 @@ class ParallelLRHMM(_LRHMM):
         i.e: the previous state.
         '''
         # similar to the forward-backward algorithm, we need to make sure that we're using fresh data for the given observations.
-        self._mapB(observations)
+        if am == 'gmm':
+            self._mapBGMM(observations)
+        elif am == 'dnn':
+            self._mapBDNN(observations)
+
         pi_log  = np.log(self.pi)
         A_log   = np.log(self.A)
         # print A_log[0][0],A_log[0][1],A_log[1][0]

@@ -93,7 +93,7 @@ class ParallelLRHSMM(_LRHMM):
     @cython.cdivision(True)
     @cython.boundscheck(False)
     @cython.wraparound(False)
-    def _viterbiHSMM(self,observations):
+    def _viterbiHSMM(self,observations,am='gmm'):
 
         forwardDelta,\
            previousState,\
@@ -111,7 +111,10 @@ class ParallelLRHSMM(_LRHMM):
         cdef int [:, ::1] coccupancy        = occupancy
 
         # calculate the observation probability and normalize for each frame into pdf sum(B_map[:,t])=1
-        self._mapB(observations)
+        if am=='gmm':
+            self._mapBGMM(observations)
+        elif am == 'dnn':
+            self._mapBDNN(observations)
         # obs = np.exp(self.B_map)
         # obs /= np.sum(obs,axis=0)
 

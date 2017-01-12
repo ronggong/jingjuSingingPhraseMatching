@@ -117,13 +117,13 @@ def evalOnSinglefilePostProcessor(filename,
 
     return order
 
-def evalOnSinglefileHsmm(filename,
-                         lyrics,
-                         posteri_probs,
-                         phrases,
-                         query_lyrics,
-                         results_path,
-                         writecsv=False):
+def evalOnSinglefileNoPost(filename,
+                           lyrics,
+                           posteri_probs,
+                           phrases,
+                           query_lyrics,
+                           results_path,
+                           writecsv=False):
 
     '''
     merge posteri_probabilities of viterbi decoding with duration probability post-processor modelling
@@ -170,7 +170,8 @@ def evalOnSinglefileHsmm(filename,
 def calculateMetrics(list_rank,
                      string_lyricsRecognizer,
                      coef_post_processor,
-                     proportion_std):
+                     proportion_std,
+                     am):
     mrr = MRR(list_rank)
     top1hit = topXhit(1,list_rank)
     top3hit = topXhit(3,list_rank)
@@ -182,7 +183,7 @@ def calculateMetrics(list_rank,
     path_eval = path.join(currentPath,
                           '..',
                           'eval',
-                          class_name+'_'+string_lyricsRecognizer+'_'+str(coef_post_processor)+'_'+str(proportion_std)+'.csv')
+                          class_name+'_'+am+'_'+string_lyricsRecognizer+'_'+str(coef_post_processor)+'_'+str(proportion_std)+'.csv')
 
     with open(path_eval,'wb') as csvfile:
         w = csv.writer(csvfile)
@@ -235,19 +236,21 @@ def compareMelodicSimiResults(path_largerPyin,list_lessNRank_phrase_name):
 
     return set.intersection(set(phrase_names_largerN),set(list_lessNRank_phrase_name))
 
-def resultAnalysisProcess(method,proportionality_std):
+def resultAnalysisProcess(method,proportionality_std,am='gmm'):
     # for cpp in [0.5,1,2,5,10]:
 
-    if method == 'lyricsRecognizerHmm':
+    if method == 'lyricsRecognizerHMM':
         path_json_dict_query_phrases = 'results/dict_query_phrases_' \
                                        + method + '_' \
-                                       + class_name + '.json'
+                                       + class_name + '_' \
+                                       + am + '.json'
         results_path = path.join(currentPath, '..', 'results/lyricsRecognizerHmmDan')
 
     else:
         path_json_dict_query_phrases = 'results/dict_query_phrases_' \
                                        + method + '_' \
                                        + class_name + '_' \
+                                       + am + '_' \
                                        + str(proportionality_std) + '.json'
         results_path = path.join(currentPath, '..', 'results/lyricsRecognizerHsmm')
 
@@ -261,7 +264,9 @@ def resultAnalysisProcess(method,proportionality_std):
     if method == 'lyricsRecognizerHMM':
 
         cpp = 1.0
-        for pstd in [0.1, 0.25, 0.5, 1.0, 1.25, 1.5, 2.0, 3.0, 4.0, 5.0]:
+        # for pstd in [0.0, 0.1, 0.25, 0.5, 1.0, 1.25, 1.5, 2.0, 3.0, 4.0, 5.0]:
+        for pstd in [0.0]:
+
             list_rank = []
             for key in dict_query_phrases:
 
@@ -279,39 +284,49 @@ def resultAnalysisProcess(method,proportionality_std):
 
                 list_state_dur_path_centroid_pho_durs    = dqp['list_state_dur_path_centroid_pho_durs']
                 list_sum_log_dur_probs                   = sumLogDurProbs(list_state_dur_path_centroid_pho_durs, pstd)
-                order = evalOnSinglefilePostProcessor(query_phrase_name,
-                                                      lyrics_net,
-                                                      posteri_probas,
-                                                      list_sum_log_dur_probs,
-                                                      phrases,
-                                                      line_lyrics,
-                                                      coef_post_processor=cpp,
-                                                      results_path=results_path,
-                                                      writecsv=False)
+
+                if pstd == 0.0:
+                    order = evalOnSinglefileNoPost(query_phrase_name,
+                                                   lyrics_net,
+                                                   posteri_probas,
+                                                   phrases,
+                                                   line_lyrics,
+                                                   results_path=results_path,
+                                                   writecsv=False)
+                else:
+                    order = evalOnSinglefilePostProcessor(query_phrase_name,
+                                                          lyrics_net,
+                                                          posteri_probas,
+                                                          list_sum_log_dur_probs,
+                                                          phrases,
+                                                          line_lyrics,
+                                                          coef_post_processor=cpp,
+                                                          results_path=results_path,
+                                                          writecsv=False)
                 list_rank.append(order)
-            calculateMetrics(list_rank, method, cpp, pstd)
+            calculateMetrics(list_rank, method, cpp, pstd, am)
 
+    elif method == 'lyricsRecognizerHSMM':
+        list_rank = []
+        for key in dict_query_phrases:
+            dqp = dict_query_phrases[key]
 
-        else:
-            list_rank = []
-            for key in dict_query_phrases:
-                dqp = dict_query_phrases[key]
+            query_phrase_name = dqp['query_phrase_name']
+            lyrics_net = dqp['lyrics_net']
+            posteri_probas = dqp['posteri_probas']
+            phrases = dqp['phrases']
+            line_lyrics = dqp['line_lyrics']
 
-                query_phrase_name = dqp['query_phrase_name']
-                lyrics_net = dqp['lyrics_net']
-                posteri_probas = dqp['posteri_probas']
-                phrases = dqp['phrases']
-                line_lyrics = dqp['line_lyrics']
+            order = evalOnSinglefileNoPost(query_phrase_name,
+                                           lyrics_net,
+                                           posteri_probas,
+                                           phrases,
+                                           line_lyrics,
+                                           results_path=results_path,
+                                           writecsv=False)
 
-                order = evalOnSinglefileHsmm(query_phrase_name,
-                                         lyrics_net,
-                                         posteri_probas,
-                                         phrases,
-                                         line_lyrics,
-                                        results_path=results_path,
-                                         writecsv=False)
-                list_rank.append(order)
-                calculateMetrics(list_rank, method, 0, 0)
+            list_rank.append(order)
+            calculateMetrics(list_rank, method, 0, 0, am)
         """
         list_less10Rank = lessNRank(dict_query_phrases.keys(), list_rank,N=3, writecsv=True)
 

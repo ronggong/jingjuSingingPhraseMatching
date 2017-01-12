@@ -57,7 +57,7 @@ elif class_name == 'laosheng':
     wavDataDir = wav_path_laosheng
     path_melodic_similarity_results = path.join(currentPath,'..','melodicSimilarity','results','900_0.7_pyin')
 
-def generalProcess(method,proportionality_std):
+def generalProcess(method,proportionality_std,am='gmm'):
     ##-- method conditions
     if method == 'obsMatrix':
         # gmmModel = gmmModelLoad()
@@ -65,13 +65,15 @@ def generalProcess(method,proportionality_std):
     elif method == 'lyricsRecognizerHMM':
         path_json_dict_query_phrases = 'results/dict_query_phrases_' \
                                        + method + '_' \
-                                       + class_name + '.json'
+                                       + class_name + '_'\
+                                       + am + '.json'
         # print np.where(mat_trans_comb==1.0)
         # print index_start
     elif method == 'lyricsRecognizerHSMM':
         path_json_dict_query_phrases = 'results/dict_query_phrases_' \
                                        + method + '_' \
-                                       + class_name + '_' \
+                                       + class_name + '_'\
+                                       + am + '_'\
                                        + str(proportionality_std) + '.json'
     else:
         pass
@@ -106,7 +108,10 @@ def generalProcess(method,proportionality_std):
             wavfile.write('temp.wav',sampleRate,wav_line)
 
             # choose feature type as mfcc or mfccBands
-            mfcc_target     = processFeature('temp.wav',feature_type='mfcc')
+            if am == 'gmm':
+                mfcc_target     = processFeature('temp.wav',feature_type='mfcc')
+            elif am == 'dnn':
+                mfcc_target     = processFeature('temp.wav',feature_type='mfccBands')
 
             N_frame         = mfcc_target.shape[0]
             duration_target = (N_frame * hopsize_phoneticSimilarity) / float(sampleRate)
@@ -136,8 +141,10 @@ def generalProcess(method,proportionality_std):
                 phrases, lyrics_net, mat_trans_comb, state_pho_comb, index_start, index_end, list_centroid_pho_dur \
                     = makeNet(dict_score_100)
                 hmm = ParallelLRHMM(lyrics_net,mat_trans_comb,state_pho_comb,index_start,index_end)
-                hmm._gmmModel(gmmModels_path)
-                paths_hmm,posteri_probas = hmm._viterbiLog(observations=mfcc_target)
+                if am == 'gmm':
+                    hmm._gmmModel(gmmModels_path)
+
+                paths_hmm,posteri_probas = hmm._viterbiLog(observations=mfcc_target,am=am)
                 # best_match_lyrics = hmm._getBestMatchLyrics(path_hmm)
                 # print best_match_lyrics
                 # print paths_hmm
@@ -208,8 +215,10 @@ def generalProcess(method,proportionality_std):
                                       index_end,
                                       mean_dur_state,
                                       proportionality_std)
-                hsmm._gmmModel(gmmModels_path)
-                paths_hmm,posteri_probas = hsmm._viterbiHSMM(observations=mfcc_target)
+                if am=='gmm':
+                    hsmm._gmmModel(gmmModels_path)
+
+                paths_hmm,posteri_probas = hsmm._viterbiHSMM(observations=mfcc_target,am=am)
 
                 dict_query_phrases[query_phrase_name] = \
                     {'query_phrase_name':   query_phrase_name,

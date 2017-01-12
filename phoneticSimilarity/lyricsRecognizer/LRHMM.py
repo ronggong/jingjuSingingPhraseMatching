@@ -4,14 +4,17 @@
 
 import sys
 import os
-import pickle
+import pickle,cPickle,gzip
 
 import numpy as np
 import matplotlib.pyplot as plt
 
 from general.parameters import *
+from general.phonemeMap import dic_pho_label_inv
+from general.filePath import dnnModels_base_path,dnnModels_cfg_path,dnnModels_param_path
 
-sys.path.append(os.path.join(os.path.dirname(__file__),"..","gmmModels"))
+current_folder = os.path.dirname(os.path.abspath(__file__))
+sys.path.append(os.path.join(current_folder,"..","gmmModels"))
 
 class _LRHMM(object):
     '''
@@ -61,9 +64,9 @@ class _LRHMM(object):
         #     for key in self.gmmModel:
         #         f.write(np.array_str(self.gmmModel[key].covars_))
 
-    def _mapB(self, observations):
+    def _mapBGMM(self, observations):
         '''
-        observation probability
+        gmm observation probability
         :param observations:
         :return:
         '''
@@ -75,6 +78,43 @@ class _LRHMM(object):
 
             # for t in xrange(dim_t):
             #     self.B_map[state][t] = logprob[t]
+    def _mapBDNN(self, observations):
+        '''
+        dnn observation probability
+        :param observations:
+        :return:
+        '''
+        ##-- save the feature to pickle
+        label = np.array([0] * len(observations))
+        filename_feature_temp       = os.path.join(dnnModels_base_path,'feature_temp.pickle.gz')
+        filename_observation_temp   = os.path.join(dnnModels_base_path,'observation_temp.pickle.gz')
+
+        with gzip.open(filename_feature_temp, 'wb') as f:
+            cPickle.dump((observations, label), f)
+
+        ##-- set environment of the pdnn
+        myenv = os.environ
+        myenv['PYTHONPATH'] = '/Users/gong/Documents/pycharmProjects/pdnn'
+
+        from subprocess import call
+
+        ##-- call pdnn to calculate the observation from the features
+        call(["/usr/local/bin/python", "/Users/gong/Documents/pycharmProjects/pdnn/cmds/run_Extract_Feats.py", "--data",
+              filename_feature_temp,
+              "--nnet-param", dnnModels_param_path, "--nnet-cfg", dnnModels_cfg_path,
+              "--output-file", filename_observation_temp, "--layer-index", "-1",
+              "--batch-size", "256"], env=myenv)
+
+        ##-- read the observation from the output
+        with gzip.open(filename_observation_temp, 'rb') as f:
+            obs = cPickle.load(f)
+
+        obs = np.log(obs)
+
+        self.B_map = {}
+        # print self.transcription, self.B_map.shape
+        for ii in xrange(obs.shape[1]):
+            self.B_map[dic_pho_label_inv[ii]] = obs[:,ii]
 
     def _viterbi(self, observations):
         '''
@@ -89,7 +129,7 @@ class _LRHMM(object):
         i.e: the previous state.
         '''
         # similar to the forward-backward algorithm, we need to make sure that we're using fresh data for the given observations.
-        self._mapB(observations)
+        self._mapBGMM(observations)
 
         delta = np.zeros((len(observations),self.n),dtype=self.precision)
         psi = np.zeros((len(observations),self.n),dtype=self.precision)
@@ -135,7 +175,7 @@ class _LRHMM(object):
         i.e: the previous state.
         '''
         # similar to the forward-backward algorithm, we need to make sure that we're using fresh data for the given observations.
-        self._mapB(observations)
+        self._mapBGMM(observations)
         pi_log  = np.log(self.pi)
         A_log   = np.log(self.A)
 
