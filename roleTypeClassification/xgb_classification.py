@@ -37,25 +37,25 @@ def feature_preprocessing(datafile):
 
     return X, y
 
-def feature_scaling_train(X, dataset):
+def feature_scaling_train(X):
     scaler = preprocessing.StandardScaler()
     scaler.fit(X)
-    pickle.dump(scaler,open(path.join(scaler_path,dataset+'.pkl'),'wb'))
-    X = scaler.transform(X)
+    pickle.dump(scaler,open(path.join(scaler_path,'feature_scaler.pkl'),'wb'))
+    # X = scaler.transform(X)
 
-    return X
+    return
 
-def feature_scaling_test(X, dataset):
-    scaler = pickle.load(open(path.join(scaler_path,dataset+'.pkl'),'r'))
+def feature_scaling_test(X):
+    scaler = pickle.load(open(path.join(scaler_path,'feature_scaler.pkl'),'r'))
     X = scaler.transform(X)
 
     return X
 
 def buildEstimators(mode):
     if mode == 'train' or mode == 'cv':
-        # best parameters got by gridsearch
+        # best parameters got by gridsearchCV, best score: 1
         estimators = [('anova_filter', SelectKBest(f_classif, k='all')),
-                      ('xgb', xgb.XGBClassifier(learning_rate=0.05,n_estimators=100,max_depth=3))]
+                      ('xgb', xgb.XGBClassifier(learning_rate=0.1,n_estimators=300,max_depth=3))]
         clf = Pipeline(estimators)
     elif mode == 'test':
         clf = pickle.load(open(join(classifier_path,"xgb_classifier.plk"), "r"))
@@ -76,6 +76,11 @@ def imputerLabelEncoder_test(X,y):
     le = pickle.load(open(join(classifier_path,"le.plk"), "r"))
     y = le.fit_transform(y)
     return X,y
+
+def imputer_run(X):
+    imputer = pickle.load(open(join(classifier_path,"inputer.plk"),'r'))
+    X = imputer.fit_transform(X)
+    return X
 
 def save_results(y_test, y_pred, labels, fold_number=0):
     pickle.dump(y_test, open("y_test_fold{number}.plk".format(number=fold_number), "w"))
@@ -154,15 +159,13 @@ if __name__ == "__main__":
     X0, y0 = feature_preprocessing(datafile[0])
     X1, y1 = feature_preprocessing(datafile[1])
 
-    if mode == 'train' or mode == 'cv':
-        X0 = feature_scaling_train(X0, dataset[0])
-        X1 = feature_scaling_train(X1, dataset[1])
-    elif mode == 'test':
-        X0 = feature_scaling_test(X0, dataset[0])
-        X1 = feature_scaling_test(X1, dataset[1])
-
     X = numpy.vstack((X0,X1))
     y = numpy.hstack((y0,y1))
+
+    if mode == 'train' or mode == 'cv':
+        feature_scaling_train(X)
+
+    X = feature_scaling_test(X)
 
     if mode == 'train' or mode == 'cv':
         X,y,imputer,le = imputerLabelEncoder_train(X,y)

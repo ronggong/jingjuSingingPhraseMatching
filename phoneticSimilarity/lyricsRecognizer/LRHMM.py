@@ -191,7 +191,7 @@ class _LRHMM(object):
         :return:
         '''
 
-        pdt_frame = pho_duration_threshold*fs/float(hopsize)
+        pdt_frame = pho_duration_threshold*fs/float(hopsize_phoneticSimilarity)
 
         path_post = [path[0]]
         counter = 1
@@ -216,7 +216,7 @@ class _LRHMM(object):
         plt.figure()
         print self.B_map.shape
         y = np.arange(self.B_map.shape[0]+1)
-        x = np.arange(self.B_map.shape[1])*hopsize/float(fs)
+        x = np.arange(self.B_map.shape[1]) * hopsize_phoneticSimilarity / float(fs)
         plt.pcolormesh(x,y,self.B_map)
         plt.plot(x,path,'b',linewidth=3)
         plt.plot(x,path_gt,'k',linewidth=3)

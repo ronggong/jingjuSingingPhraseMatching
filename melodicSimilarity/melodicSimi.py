@@ -9,13 +9,16 @@ import vamp
 from os import path
 
 
-def pitchProcessing_audio(filename_wav,thres_high_freq=1000,thres_pitch_confidence=0.85):
+def pitchProcessing_audio(filename_wav,
+                          thres_high_freq=900,
+                          thres_pitch_confidence=0.7,
+                          movingAve=False):
     '''
     pitch track by yin essentia
     '''
     loader = EqloudLoader(filename=filename_wav)
-    fc = FrameCutter(frameSize=framesize,
-                         hopSize=hopsize)
+    fc = FrameCutter(frameSize=framesize_melodicSimilarity,
+                     hopSize=hopsize_melodicSimilarity)
     loader.audio >> fc.signal
 
     # windowing:
@@ -27,7 +30,7 @@ def pitchProcessing_audio(filename_wav,thres_high_freq=1000,thres_pitch_confiden
     w.frame >> spec.frame
 
     # pitch yin FFT
-    pitch = PitchYinFFT(frameSize=framesize, sampleRate = loader.paramValue('sampleRate'))
+    pitch = PitchYinFFT(frameSize=framesize_melodicSimilarity, sampleRate = loader.paramValue('sampleRate'))
     spec.spectrum >> pitch.spectrum
 
     p = essentia.Pool()
@@ -42,6 +45,11 @@ def pitchProcessing_audio(filename_wav,thres_high_freq=1000,thres_pitch_confiden
 
     # convert pitch from hz to cents
     pitchInCents = hz2cents(pitch)
+
+    if movingAve:
+        moving = ess.MovingAverage(size=9)
+        pitchInCents = moving(pitchInCents)
+        pitchInCents = pitchInCents[4:-4]
 
     # mean normalization
     # pitchInCents = pitchInCents-np.mean(pitchInCents)
@@ -64,12 +72,17 @@ def discardPitch(pitch,pitchConfidence,low_threshold_pitch,high_threshold_pitch,
     pitchConfidenceNew = np.array(pitchConfidenceNew)
     return pitchNew,pitchConfidenceNew
 
-def pitchProcessingPyin(filename_wav,sr):
+def pitchProcessingPyin(filename_wav,sr,movingAve=False):
     loader = ess.MonoLoader(filename=filename_wav, downmix = 'left', sampleRate = sr)
     audio = loader()
     data = vamp.collect(audio, sr, "pyin:pyin", output='smoothedpitchtrack')
     pitch = data['vector'][1]
     pitchInCents = hz2cents(pitch)
+
+    if movingAve:
+        moving = ess.MovingAverage(size=5)
+        pitchInCents = moving(pitchInCents)
+
     return pitchInCents
     # plotPitch(pitch,[])
 

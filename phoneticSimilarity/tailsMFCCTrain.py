@@ -67,8 +67,8 @@ def dumpFeature(class_name,recordings,syllableTierName,phonemeTierName):
                 if p[2] in ['c','m','l','x','f','k',"r\'",'']:
                     continue
 
-                sf = round(p[0]*fs/float(hopsize)) # starting frame
-                ef = round(p[1]*fs/float(hopsize)) # ending frame
+                sf = round(p[0] * fs / float(hopsize_phoneticSimilarity)) # starting frame
+                ef = round(p[1] * fs / float(hopsize_phoneticSimilarity)) # ending frame
 
                 mfcc_p = mfcc[sf:ef,:]  # phoneme syllable
 

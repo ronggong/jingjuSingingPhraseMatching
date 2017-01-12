@@ -3,7 +3,14 @@
 '''
 the debug printf is written in dtw.c or cdtw.pyx
 '''
-from os import path,makedirs
+from os import path,makedirs,chdir
+import sys
+
+currentPath = path.dirname(__file__)
+parentPath = path.join(currentPath, '..' ,'roleTypeClassification')
+sys.path.append(parentPath)
+
+from roletypeProcess4MelodicSimi import roletypeProcess
 from operator import itemgetter
 import json
 
@@ -11,7 +18,7 @@ from scipy.io import wavfile
 import unicodecsv as csv
 import numpy as np
 
-from general.trainTestSeparation import getRecordingNamesSimi
+from general.trainTestSeparation import getRecordingNamesSimi,getRecordings
 from general.textgridParser import syllableTextgridExtraction
 from general.filePath import *
 from general.dtwSankalp import dtw1d_generic,dtw1d_std,plotDTW
@@ -23,21 +30,42 @@ from general.eval import stringDist,MRR,topXhit
 with open('scores.json','r') as f:
     dict_score = json.load(f)
 
-class_name = 'laosheng'
+# class_name = 'dan'
 dist_measures = ['euclideanDist','dtw111']
 dm = dist_measures[1]
 
-if class_name == 'dan':
+if class_name == 'danAll':
     textgridDataDir = textgrid_path_dan
     wavDataDir = wav_path_dan
 elif class_name == 'laosheng':
     textgridDataDir = textgrid_path_laosheng
     wavDataDir = wav_path_laosheng
 
-def runProcess(thres_high_freq=1000,thres_pitch_confidence=0.85):
+def runProcess(pyin=False,
+               thres_high_freq=1000,
+               thres_pitch_confidence=0.85,
+               movingAve=False,
+               roleTypeWeight=False):
+
+    if movingAve:
+        string_moving = '_movingAve'
+    else:
+        string_moving = ''
+
+    if pyin:
+        string_pyin = '_pyin'
+    else:
+        string_pyin = ''
+
+    if roleTypeWeight:
+        string_roleTypeWeight = '_roleTypeWeight'
+    else:
+        string_roleTypeWeight = ''
+
     list_rank = {}
     query_pitchtracks = {}
     files = [filename for filename in getRecordingNamesSimi('TEST',class_name)]
+    # files = getRecordings(textgrid_path_dan)
     for filename in files:
         nestedPhonemeLists, _, _ = syllableTextgridExtraction(textgridDataDir, filename, 'line', 'details')
         sampleRate, wavData = wavfile.read(path.join(wavDataDir,filename+'.wav'))
@@ -59,10 +87,20 @@ def runProcess(thres_high_freq=1000,thres_pitch_confidence=0.85):
 
             ##-- query pitchtrack
             name_query_pitchtrack = filename+'_'+str(i)
-            pitchInCents, _ = pitchProcessing_audio('temp.wav',
-                                                    thres_high_freq=thres_high_freq,
-                                                    thres_pitch_confidence=thres_pitch_confidence)
-            # pitchInCents = pitchProcessingPyin('temp.wav',sampleRate)
+
+            ##-- roletype classfication
+            predict_proba_roletype  = roletypeProcess(wavDataDir,line_list,filename,name_query_pitchtrack)
+            dist_weight_dan         = 1.0/predict_proba_roletype[0][0]
+            dist_weight_laosheng    = 1.0/predict_proba_roletype[0][1]
+            chdir(currentPath)
+
+            if pyin:
+                pitchInCents = pitchProcessingPyin('temp.wav',sampleRate,movingAve)
+            else:
+                pitchInCents, _ = pitchProcessing_audio('temp.wav',
+                                                        thres_high_freq=thres_high_freq,
+                                                        thres_pitch_confidence=thres_pitch_confidence,
+                                                        movingAve=movingAve)
 
             pitchInCents -= np.mean(pitchInCents)
             pitchInCents = pitchtrackInterp(pitchInCents)
@@ -73,8 +111,8 @@ def runProcess(thres_high_freq=1000,thres_pitch_confidence=0.85):
             dtw_path = {}
             # best_udist = float('Inf')
             for key in dict_score:
-                lyrics = dict_score[key]['lyrics']
-                pitchtrack_cents = dict_score[key]['pitchtrack_cents']
+                lyrics              = dict_score[key]['lyrics']
+                pitchtrack_cents    = dict_score[key]['pitchtrack_cents']
 
                 print filename,i,key
                 # if filename == 'lseh-Wei_guo_jia-Hong_yang_dong02-qm' and \
@@ -91,6 +129,16 @@ def runProcess(thres_high_freq=1000,thres_pitch_confidence=0.85):
                 elif dm == 'euclideanDist':
                     udist = euclideanDist(np.array(pitchInCents),np.array(pitchtrack_cents))
                 print filename,'done'
+
+                if roleTypeWeight:
+                    role_type = dict_score[key]['role_type']
+                    if role_type == 'laosheng':
+                        dist_weight = dist_weight_laosheng
+                    else:
+                        dist_weight = dist_weight_dan
+                    udist *= dist_weight
+                    print('role type weighting done.')
+
                 sdist = stringDist(line_lyrics,lyrics)
                 list_simi.append([key,lyrics,udist,sdist])
                 # list_simi.append([key,lyrics,sdist])
@@ -104,7 +152,14 @@ def runProcess(thres_high_freq=1000,thres_pitch_confidence=0.85):
             order = list_sdist.index(max(list_sdist))
 
             ##-- dump the results and path
-            directory_results = 'results/'+str(thres_high_freq)+'_'+str(thres_pitch_confidence)
+            directory_results = 'results/'\
+                                +class_name+'_'\
+                                +str(thres_high_freq)+'_'\
+                                +str(thres_pitch_confidence)\
+                                +string_moving\
+                                +string_pyin\
+                                +string_roleTypeWeight
+
             if not path.isdir(directory_results):
                 makedirs(directory_results)
 
@@ -114,7 +169,14 @@ def runProcess(thres_high_freq=1000,thres_pitch_confidence=0.85):
                 for row_simi in list_simi:
                     w.writerow(row_simi)
 
-            directory_resultsPath = 'resultsPath/'+str(thres_high_freq)+'_'+str(thres_pitch_confidence)
+            directory_resultsPath = 'resultsPath/'\
+                                    +class_name+'_'\
+                                    +str(thres_high_freq)+'_'\
+                                    +str(thres_pitch_confidence)\
+                                    +string_moving\
+                                    +string_pyin\
+                                    +string_roleTypeWeight
+
             if not path.isdir(directory_resultsPath):
                 makedirs(directory_resultsPath)
 
@@ -128,14 +190,22 @@ def runProcess(thres_high_freq=1000,thres_pitch_confidence=0.85):
             list_rank[name_query_pitchtrack] = [order,list_simi[order-1][2]]
 
     with open('query_pitchtracks_'
+                        +class_name+'_'
                       +str(thres_high_freq)+'_'
                       +str(thres_pitch_confidence)
+                      +string_moving
+                      +string_pyin
+                      +string_roleTypeWeight
                       +'.json','w') as outfile:
         json.dump(query_pitchtracks,outfile)
 
     with open('list_rank_'
+                        +class_name+'_'
                       +str(thres_high_freq)+'_'
                       +str(thres_pitch_confidence)
+                      +string_moving
+                      +string_pyin
+                      +string_roleTypeWeight
                       +'.json','w') as outfile:
         json.dump(list_rank,outfile)
 
@@ -154,6 +224,9 @@ def runProcess(thres_high_freq=1000,thres_pitch_confidence=0.85):
                       +dm+'_distNoNormalize_'
                       +str(thres_high_freq)+'_'
                       +str(thres_pitch_confidence)
+                      +string_moving
+                      +string_pyin
+                      +string_roleTypeWeight
                       +'.csv','wb') as csvfile:
 
         w = csv.writer(csvfile)
@@ -168,4 +241,8 @@ def runProcess(thres_high_freq=1000,thres_pitch_confidence=0.85):
 
 # best parameter is 900, 0.7
 for params in [[900,0.7]]:
-    runProcess(thres_high_freq=params[0],thres_pitch_confidence=params[1])
+    runProcess(thres_high_freq=params[0],
+               thres_pitch_confidence=params[1],
+               movingAve=False,
+               pyin=True,
+               roleTypeWeight=True)

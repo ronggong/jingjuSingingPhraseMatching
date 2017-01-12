@@ -7,7 +7,7 @@ import pandas as pd
 from scipy.io import wavfile,savemat
 
 from general.textgridParser import syllableTextgridExtraction
-from general.trainTestSeparation import getRecordingNames
+from general.trainTestSeparation import getRecordingNamesSimi
 from general.filePath import *
 from general.utilsFunctions import hz2cents
 
@@ -320,11 +320,12 @@ if __name__ == '__main__':
 
     feature_set = pd.DataFrame()
 
-    files = [filename for filename in getRecordingNames(train_test,class_name)]
+    files = [filename for filename in getRecordingNamesSimi(train_test,class_name)]
     for filename in files:
         nestedPhonemeLists, _, _ = syllableTextgridExtraction(textgridDataDir, filename, 'line', 'details')
         print filename
         for i, line_list in enumerate(nestedPhonemeLists):
+            # print line_list[0]
 
             if train_test == 'TRAIN':
                 line_list_current = line_list[1]

@@ -7,14 +7,13 @@ from general.phonemeMap import *
 from general.parameters import *
 
 import os,sys
-import json
+# import json
 
 currentPath = os.path.dirname(__file__)
 parentPath = os.path.join(currentPath, '../../CythonModule')
 sys.path.append(parentPath)
 
 from helpFuncs import viterbiLoopHelperCython
-
 
 def transcriptionMapping(transcription):
     transcription_maped = []
@@ -113,8 +112,8 @@ class ParallelLRHMM(_LRHMM):
 
 
         # termination: find the maximum probability for the entire sequence (=highest prob path)
-        p_max   = -float("inf") # max value in time T (max)
-        path    = np.zeros((len(observations)),dtype=self.precision)
+        # p_max   = -float("inf") # max value in time T (max)
+        # path    = np.zeros((len(observations)),dtype=self.precision)
 
         # last path is self.n-1
         # path[len(observations)-1] = self.n-1
@@ -123,26 +122,49 @@ class ParallelLRHMM(_LRHMM):
         #         p_max = delta[len(observations)-1][i]
         #         path[len(observations)-1] = i
         posteri_probs = np.zeros((len(self.idx_final_tail),),dtype=self.precision)
+        paths = []
         counter_posteri = 0
         for i in xrange(self.n):
             if i in self.idx_final_tail:
-                endingProb = 0.0
+                # endingProb = 0.0
 
                 posteri_probs[counter_posteri] = delta[len(observations)-1][i]
+                path    = np.zeros((len(observations)),dtype=self.precision)
+
+                # tracking all parallel paths
+                # path backtracing
+                #        path = np.zeros((len(observations)),dtype=self.precision) ### 2012-11-17 - BUG FIX: wrong reinitialization destroyed the last state in the path
+                path[len(observations)-1] = i
+                for j in xrange(1, len(observations)):
+                    path[len(observations)-j-1] = psi[len(observations)-j][ path[len(observations)-j] ]
+                paths.append(path)
                 counter_posteri += 1
             else:
-                endingProb = -float('Inf')
+                pass
+                # endingProb = -float('Inf')
 
-            if (p_max < delta[len(observations)-1][i]+endingProb):
-                p_max = delta[len(observations)-1][i]+endingProb
-                path[len(observations)-1] = i
+            # if (p_max < delta[len(observations)-1][i]+endingProb):
+            #     p_max = delta[len(observations)-1][i]+endingProb
+            #     path[len(observations)-1] = i
 
-        # path backtracing
-#        path = np.zeros((len(observations)),dtype=self.precision) ### 2012-11-17 - BUG FIX: wrong reinitialization destroyed the last state in the path
-        for i in xrange(1, len(observations)):
-            path[len(observations)-i-1] = psi[len(observations)-i][ path[len(observations)-i] ]
+        return paths,posteri_probs
 
-        return path,posteri_probs
+    def _pathStateDur(self,path):
+        '''
+        path states in phoneme and duration
+        :param path:
+        :return:
+        '''
+        dur_frame = 1
+        state_dur_path = []
+        for ii in xrange(1,len(path)):
+            if path[ii] != path[ii-1]:
+                state_dur_path.append([self.transcription[int(path[ii-1])], dur_frame * hopsize_phoneticSimilarity / float(fs)])
+                dur_frame = 1
+            else:
+                dur_frame += 1
+        state_dur_path.append([self.transcription[int(path[-1])], dur_frame * hopsize_phoneticSimilarity / float(fs)])
+        return state_dur_path
 
     def _plotNetwork(self,path):
         self.net.plotNetwork(path)
@@ -179,7 +201,7 @@ class ParallelLRHMM(_LRHMM):
         n_states = B_map_unique.shape[0]
         n_frame  = B_map_unique.shape[1]
         y = np.arange(n_states+1)
-        x = np.arange(n_frame)*hopsize/float(fs)
+        x = np.arange(n_frame) * hopsize_phoneticSimilarity / float(fs)
 
         plt.pcolormesh(x,y,B_map_unique)
         plt.plot(x,path_unique,'b',linewidth=3)

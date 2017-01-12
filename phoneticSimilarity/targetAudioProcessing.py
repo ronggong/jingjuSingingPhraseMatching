@@ -3,7 +3,7 @@ from essentia.streaming import *
 from general.parameters import *
 from general.filePath import *
 from sklearn import preprocessing
-from acousticModelTraining import getFeature
+from acousticModelTraining import getFeature,getMFCCBands
 import numpy as np
 import pickle
 from os import path
@@ -14,8 +14,8 @@ import matplotlib.pyplot as plt
 
 def pitchProcessing_audio(filename_wav):
     loader = EqloudLoader(filename=filename_wav)
-    fc = FrameCutter(frameSize=framesize,
-                         hopSize=hopsize)
+    fc = FrameCutter(frameSize=framesize_phoneticSimilarity,
+                     hopSize=hopsize_phoneticSimilarity)
     loader.audio >> fc.signal
 
     # windowing:
@@ -27,7 +27,7 @@ def pitchProcessing_audio(filename_wav):
     w.frame >> spec.frame
 
     # pitch yin FFT
-    pitch = PitchYinFFT(frameSize=framesize, sampleRate = loader.paramValue('sampleRate'))
+    pitch = PitchYinFFT(frameSize=framesize_phoneticSimilarity, sampleRate = loader.paramValue('sampleRate'))
     spec.spectrum >> pitch.spectrum
 
     p = essentia.Pool()
@@ -55,9 +55,12 @@ def discardPitch(pitch,pitchConfidence,low_threshold_pitch,high_threshold_pitch,
 
     return index_keep
 
-def mfccFeature_audio(filename_wav,index_keep):
+def mfccFeature_audio(filename_wav,index_keep,feature_type='mfcc'):
     audio               = ess.MonoLoader(downmix = 'left', filename = filename_wav, sampleRate = fs)()
-    feature             = getFeature(audio)
+    if feature_type == 'mfcc':
+        feature             = getFeature(audio)
+    else:
+        feature             = getMFCCBands(audio)
     # feature             = preprocessing.StandardScaler().fit_transform(feature)
     index_keep          = pitchProcessing_audio(filename_wav)
     feature_out         = feature[index_keep[0],:]
@@ -112,9 +115,9 @@ def obsMatrixPho(feature,gmmModel):
             obsM[ii,:] = gmmModel[pho].score_samples(feature)
     return obsM
 
-def processMFCC(filename_wav):
+def processFeature(filename_wav,feature_type='mfcc'):
     index_keep = pitchProcessing_audio(filename_wav)
-    feature = mfccFeature_audio(filename_wav,index_keep)
+    feature = mfccFeature_audio(filename_wav,index_keep,feature_type)
     return feature
 
 def obsMPlot(obsM):
@@ -125,7 +128,7 @@ def obsMPlot(obsM):
     ax = fig.add_subplot(111)
     # print obsM.shape
     y = np.arange(obsM.shape[0]+1)
-    x = np.arange(obsM.shape[1])*hopsize/float(fs)
+    x = np.arange(obsM.shape[1]) * hopsize_phoneticSimilarity / float(fs)
     ax.pcolormesh(x,y,obsM)
     #set ticks
     T=np.arange(len(finals))+0.5
@@ -142,7 +145,7 @@ def obsMPlotPho(obsM):
     ax = fig.add_subplot(111)
     # print obsM.shape
     y = np.arange(obsM.shape[0]+1)
-    x = np.arange(obsM.shape[1])*hopsize/float(fs)
+    x = np.arange(obsM.shape[1]) * hopsize_phoneticSimilarity / float(fs)
     ax.pcolormesh(x,y,obsM)
     #set ticks
     T=np.arange(len(dic_pho_map.values()))+0.5

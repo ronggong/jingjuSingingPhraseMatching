@@ -2,11 +2,12 @@
 # -*- coding: utf-8 -*-
 
 import os
-import pickle
+import pickle,cPickle,gzip
 
 import numpy as np
 from sklearn import mixture
 from sklearn import preprocessing
+from sklearn.model_selection import train_test_split
 import essentia.standard as ess
 
 from general.textgridParser import syllableTextgridExtraction
@@ -19,10 +20,10 @@ from general.phonemeMap import *
 from general.filePath import *
 
 winAnalysis     = 'hann'
-N               = 2 * framesize                     # padding 1 time framesize
+N               = 2 * framesize_phoneticSimilarity                     # padding 1 time framesize
 SPECTRUM        = ess.Spectrum(size=N)
-MFCC            = ess.MFCC(sampleRate=fs,highFrequencyBound=highFrequencyBound,inputSize=framesize+1)
-WINDOW          = ess.Windowing(type=winAnalysis, zeroPadding=N-framesize)
+MFCC            = ess.MFCC(sampleRate=fs, highFrequencyBound=highFrequencyBound, inputSize=framesize_phoneticSimilarity + 1)
+WINDOW          = ess.Windowing(type=winAnalysis, zeroPadding=N - framesize_phoneticSimilarity)
 
 def getFeature(audio):
 
@@ -35,19 +36,41 @@ def getFeature(audio):
 
     mfcc   = []
     # audio_p = audio[p[0]*fs:p[1]*fs]
-    for frame in ess.FrameGenerator(audio, frameSize=framesize, hopSize=hopsize):
+    for frame in ess.FrameGenerator(audio, frameSize=framesize_phoneticSimilarity, hopSize=hopsize_phoneticSimilarity):
         frame           = WINDOW(frame)
         mXFrame         = SPECTRUM(frame)
         bands,mfccFrame = MFCC(mXFrame)
         mfccFrame       = mfccFrame[1:]
         mfcc.append(mfccFrame)
-        # mfcc.append(bands)
 
     mfcc            = np.array(mfcc).transpose()
     dmfcc           = Fdeltas(mfcc,w=5)
     ddmfcc          = Fdeltas(dmfcc,w=5)
     feature         = np.transpose(np.vstack((mfcc,dmfcc,ddmfcc)))
-    # feature = np.array(mfcc)
+
+
+    return feature
+
+def getMFCCBands(audio):
+
+    '''
+    MFCC bands feature [p[0],p[1]], this function only for pdnn acoustic model training
+    it needs the array format float32
+    :param audio:
+    :param p:
+    :return:
+    '''
+
+    mfcc   = []
+    # audio_p = audio[p[0]*fs:p[1]*fs]
+    for frame in ess.FrameGenerator(audio, frameSize=framesize_phoneticSimilarity, hopSize=hopsize_phoneticSimilarity):
+        frame           = WINDOW(frame)
+        mXFrame         = SPECTRUM(frame)
+        bands,mfccFrame = MFCC(mXFrame)
+        mfcc.append(bands)
+
+    # the mel bands features
+    feature = np.array(mfcc,dtype='float32')
 
     return feature
 
@@ -59,7 +82,7 @@ def getMBE(audio):
     '''
 
     mfccBands = []
-    for frame in ess.FrameGenerator(audio, frameSize=framesize, hopSize=hopsize):
+    for frame in ess.FrameGenerator(audio, frameSize=framesize_phoneticSimilarity, hopSize=hopsize_phoneticSimilarity):
 
         frame           = WINDOW(frame)
         mXFrame         = SPECTRUM(frame)
@@ -75,7 +98,7 @@ def dumpFeature(class_name,recordings,syllableTierName,phonemeTierName):
     :return:
     '''
 
-    if class_name == 'dan':
+    if class_name == 'danAll':
         textgrid_path = textgrid_path_dan
         wav_path    = wav_path_dan
     elif class_name == 'laosheng':
@@ -111,8 +134,8 @@ def dumpFeature(class_name,recordings,syllableTierName,phonemeTierName):
                 if p[2] in ['c','m','l','x','f','k',"r\'",'']:
                     continue
 
-                sf = round(p[0]*fs/float(hopsize)) # starting frame
-                ef = round(p[1]*fs/float(hopsize)) # ending frame
+                sf = round(p[0] * fs / float(hopsize_phoneticSimilarity)) # starting frame
+                ef = round(p[1] * fs / float(hopsize_phoneticSimilarity)) # ending frame
 
                 mfcc_p = mfcc[sf:ef,:]  # phoneme syllable
 
@@ -123,13 +146,13 @@ def dumpFeature(class_name,recordings,syllableTierName,phonemeTierName):
 
     return dic_final_feature
 
-def dumpFeaturePho(class_name,recordings,syllableTierName,phonemeTierName):
+def dumpFeaturePho(class_name,recordings,syllableTierName,phonemeTierName,feature_type='mfcc'):
     '''
     dump the MFCC for each phoneme
     :param recordings:
     :return:
     '''
-    if class_name == 'dan':
+    if class_name == 'danAll':
         textgrid_path = textgrid_path_dan
         wav_path    = wav_path_dan
     elif class_name == 'laosheng':
@@ -150,8 +173,14 @@ def dumpFeaturePho(class_name,recordings,syllableTierName,phonemeTierName):
         wav_full_filename   = os.path.join(wav_path,recording+'.wav')
         audio               = ess.MonoLoader(downmix = 'left', filename = wav_full_filename, sampleRate = fs)()
 
-        # MFCC feature
-        mfcc = getFeature(audio)
+        if feature_type == 'mfcc':
+            # MFCC feature
+            mfcc = getFeature(audio)
+        elif feature_type == 'mfccbands':
+            # MFCC energy bands feature
+            mfcc = getMFCCBands(audio)
+        else:
+            raise('feature type not exists, either mfcc or mfccbands.')
 
         for ii,pho in enumerate(nestedPhonemeLists):
             print 'calculating ', recording, ' and phoneme ', str(ii), ' of ', str(len(nestedPhonemeLists))
@@ -159,8 +188,8 @@ def dumpFeaturePho(class_name,recordings,syllableTierName,phonemeTierName):
                 # map from annotated xsampa to readable notation
                 key = dic_pho_map[p[2]]
 
-                sf = round(p[0]*fs/float(hopsize)) # starting frame
-                ef = round(p[1]*fs/float(hopsize)) # ending frame
+                sf = round(p[0] * fs / float(hopsize_phoneticSimilarity)) # starting frame
+                ef = round(p[1] * fs / float(hopsize_phoneticSimilarity)) # ending frame
 
                 mfcc_p = mfcc[sf:ef,:]  # phoneme syllable
 
@@ -171,6 +200,29 @@ def dumpFeaturePho(class_name,recordings,syllableTierName,phonemeTierName):
 
     return dic_pho_feature
 
+def trainValidationSplit(dic_pho_feature_train,validation_size=0.2):
+    '''
+    split the feature in dic_pho_feature_train into train and validation set
+    :param dic_pho_feature_train: input dictionary, key: phoneme, value: feature vectors
+    :return:
+    '''
+    feature_all = []
+    label_all = []
+    for key in dic_pho_feature_train:
+        feature = dic_pho_feature_train[key]
+        label = [dic_pho_label[key]] * len(feature)
+
+        if len(feature):
+            if not len(feature_all):
+                feature_all = feature
+            else:
+                feature_all = np.vstack((feature_all, feature))
+            label_all += label
+    label_all = np.array(label_all,dtype='int64')
+    feature_train, feature_validation, label_train, label_validation = \
+        train_test_split(feature_all, label_all, test_size=validation_size, stratify=label_all)
+
+    return feature_train, feature_validation, label_train, label_validation
 
 def bicGMMModelSelection(X):
     '''
@@ -276,13 +328,13 @@ def processAcousticModelTrainPho(class_name,syllableTierName,phonemeTierName,fea
     # recordings_train = [recordings[i] for i in number_train]
 
     # model training
-    # recordings_train = getRecordingNamesSimi('TRAIN',class_name)
-    #
-    # dic_pho_feature_train = dumpFeaturePho(class_name,recordings_train,syllableTierName,phonemeTierName)
-    #
-    # output = open(featureFilename, 'wb')
-    # pickle.dump(dic_pho_feature_train, output)
-    # output.close()
+    recordings_train = getRecordingNamesSimi('TRAIN',class_name)
+
+    dic_pho_feature_train = dumpFeaturePho(class_name,recordings_train,syllableTierName,phonemeTierName)
+
+    output = open(featureFilename, 'wb')
+    pickle.dump(dic_pho_feature_train, output)
+    output.close()
 
     # model loading
     pkl_file = open(featureFilename, 'rb')
@@ -327,3 +379,33 @@ if __name__ == '__main__':
                               phonemeTierName=phonemeTierName,
                               featureFilename='dic_pho_feature_train_'+class_name+'.pkl',
                               gmmModel_path=gmmModels_path)
+
+    """
+    # dump feature for DNN training, with getFeature output MFCC bands
+    recordings_train = getRecordingNamesSimi('TRAIN', 'laosheng')
+
+    dic_pho_feature_train_laosheng = dumpFeaturePho('laosheng', recordings_train, syllableTierName, phonemeTierName, feature_type='mfccbands')
+
+    feature_train, feature_validation, label_train, label_validation = trainValidationSplit(dic_pho_feature_train_laosheng, validation_size=0.2)
+
+    cPickle.dump((feature_train,label_train),gzip.open('train_set_laosheng_phraseMatching.pickle.gz', 'wb'),cPickle.HIGHEST_PROTOCOL)
+    cPickle.dump((feature_validation, label_validation), gzip.open('validation_set_laosheng_phraseMatching.pickle.gz', 'wb'), cPickle.HIGHEST_PROTOCOL)
+
+    print len(feature_train),len(feature_validation),len(label_train),len(label_validation)
+    print (feature_train,label_train)
+
+    # dump feature danAll
+    recordings_train = getRecordingNamesSimi('TRAIN', 'danAll')
+
+    dic_pho_feature_train_danAll = dumpFeaturePho('danAll', recordings_train, syllableTierName, phonemeTierName, feature_type='mfccbands')
+
+    feature_train, feature_validation, label_train, label_validation = trainValidationSplit(
+        dic_pho_feature_train_danAll, validation_size=0.2)
+
+    with gzip.open('train_set_danAll_phraseMatching.pkl.gz', 'wb') as f:
+        cPickle.dump((feature_train, label_train), f)
+
+    with gzip.open('validation_set_danAll_phraseMatching.pkl.gz', 'wb') as f:
+        cPickle.dump((feature_validation, label_validation), f)
+    """
+

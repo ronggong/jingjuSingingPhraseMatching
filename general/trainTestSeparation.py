@@ -73,6 +73,8 @@ def getRecordingNamesSimi(train_test,mode):
                             'lsxp-Guo_liao_yi-Wen_zhao_guan-upf',
                             'lsxp-Huai_nan_wang-Huai_he_ying01-lon',
                             'lsxp-Wo_zheng_zai-Kong_cheng_ji02-qm']
+
+        # these arias are in the score corpus 88 lines
         recordings_test = [
                       'lseh-Wei_guo_jia-Hong_yang_dong01-lon',
                       'lseh-Wei_guo_jia-Hong_yang_dong02-qm',
@@ -84,12 +86,62 @@ def getRecordingNamesSimi(train_test,mode):
                       'lsxp-Jiang_shen_er-San_jia_dian02-qm',
                       'lsxp-Shen_gong_wu-Gan_lu_si-qm',
                       'lsxp-Wo_ben_shi-Kong_cheng_ji-qm']
-    elif mode == 'dan':
-        recordings_test = [
-                      'zhuangyuanmei_zinari'
-       ]
+    elif mode == 'danAll':
+
+        # recordings_train = ['shiwenhui_tingxiongyan', 'wangjiangting_zhijianta', 'xixiangji_diyilai', 'xixiangji_luanchouduo', 'xixiangji_manmufeng', 'xixiangji_zhenmeijiu', 'yutangchun_yutangchun', 'zhuangyuanmei_daocishi', 'zhuangyuanmei_tianbofu', 'zhuangyuanmei_zhenzhushan', 'zhuangyuanmei_zinari']
+        # recordings_test  = ['wangjiangting_dushoukong', 'xixiangji_biyuntian', 'xixiangji_xianzhishuo', 'zhuangyuanmei_fudingkui']
+
+        recordings_train = ['daeh-Bie_yuan_zhong-Mei_fei-qm',
+                            'daeh-Yang_Yu_huan-Tai_zhen_wai_zhuan-lon',
+                            'daeh-Yi_sha_shi-Suo_lin_nang-qm',
+                            'daeh-You_He_hou-He_hou_ma_dian-qm',
+                            'dafeh-Bi_yun_tian-Xi_xiang_ji01-qm',
+                            'dafeh-Mo_lai_you-Liu_yue_xue-qm',
+                            'dagbz-Feng_xiao_xiao-Yang_men_nv_jiang-lon',
+                            'danbz-Bei_jiu_chan-Chun_gui_men01-qm',
+                            'danbz-Bei_jiu_chan-Chun_gui_men03-qm',
+                            'danbz-Kan_dai_wang-Ba_wang_bie_ji01-qm',
+                            'danbz-Kan_dai_wang-Ba_wang_bie_ji03-qm',
+                            'danbz-Qing_chen_qi-Shi_yu_zhuo-qm',
+                            'daspd-Du_shou_kong-Wang_jiang_ting-upf',
+                            'daspd-Hai_dao_bing-Gui_fei_zui_jiu01-lon',
+                            'daspd-Hai_dao_bing-Gui_fei_zui_jiu02-qm',
+                            'daxp-Guan_Shi_yin-Tian_nv_san_hua-lon',
+                            'daxp-Jiao_Zhang_sheng-Hong_niang01-qm',
+                            'daxp-Jiao_Zhang_sheng-Hong_niang04-qm',
+                            'daxp-Jiao_Zhang_sheng-Hong_niang05-qm',
+                            'daxp-Zhe_cai_shi-Suo_lin_nang01-qm',
+                            'shiwenhui_tingxiongyan',
+                            'wangjiangting_dushoukong',
+                            'wangjiangting_zhijianta',
+                            'xixiangji_biyuntian',
+                            'xixiangji_diyilai',
+                            'xixiangji_luanchouduo',
+                            'xixiangji_manmufeng',
+                            'xixiangji_xianzhishuo',
+                            'xixiangji_zhenmeijiu',
+                            'yutangchun_yutangchun',
+                            'zhuangyuanmei_daocishi',
+                            'zhuangyuanmei_fudingkui',
+                            'zhuangyuanmei_tianbofu',
+                            'zhuangyuanmei_zhenzhushan']
+
+        # only 1 test recording in the score corpus, 16 lines in total
+        # below is the qmLonUpf dataset, all lines in these arias are in the score corpus, 47 lines in total
+
+        recordings_test = ['zhuangyuanmei_zinari',
+                           'daxp-Chun_qiu_ting-Suo_lin_nang01-qm',
+                           'daxp-Chun_qiu_ting-Suo_lin_nang03-qm',
+                           'daxp-Meng_ting_de-Mu_Gui_ying_gua_shuai01-upf',
+                           'daxp-Meng_ting_de-Mu_Gui_ying_gua_shuai02-qm',
+                           'daxp-Meng_ting_de-Mu_Gui_ying_gua_shuai04-qm',
+                           'daxp-Meng_ting_de-Mu_Gui_ying_gua_shuai06-qm',
+                           'daxp-Xi_ri_li-Gan_lu_si-qm'
+                           ]
 
     if train_test == 'TRAIN':
         return recordings_train
     else:
         return recordings_test
+
+
