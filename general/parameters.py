@@ -15,4 +15,6 @@ hopsize_phoneticSimilarity     = 512
 framesize_t_phoneticSimiarity = framesize_phoneticSimilarity / float(fs)
 hopsize_t_phoneticSimilarity = hopsize_phoneticSimilarity / float(fs)
 
+# MFCC parameters
 highFrequencyBound = fs/2 if fs/2<11000 else 11000
+am = 'gmm'

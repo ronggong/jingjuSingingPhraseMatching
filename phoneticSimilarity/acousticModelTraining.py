@@ -19,10 +19,22 @@ from general.pinyinMap import *
 from general.phonemeMap import *
 from general.filePath import *
 
+
+##-- number of Mel bands used in MFCC function
+if am == 'gmm':
+    numberBands = 40
+elif am == 'dnn':
+    numberBands = 80
+else:
+    raise('am acoustic model param is not exist.')
+
 winAnalysis     = 'hann'
 N               = 2 * framesize_phoneticSimilarity                     # padding 1 time framesize
 SPECTRUM        = ess.Spectrum(size=N)
-MFCC            = ess.MFCC(sampleRate=fs, highFrequencyBound=highFrequencyBound, inputSize=framesize_phoneticSimilarity + 1)
+MFCC            = ess.MFCC(sampleRate           =fs,
+                           highFrequencyBound   =highFrequencyBound,
+                           inputSize            =framesize_phoneticSimilarity + 1,
+                           numberBands          =numberBands)
 WINDOW          = ess.Windowing(type=winAnalysis, zeroPadding=N - framesize_phoneticSimilarity)
 
 def getFeature(audio):
@@ -219,6 +231,8 @@ def trainValidationSplit(dic_pho_feature_train,validation_size=0.2):
                 feature_all = np.vstack((feature_all, feature))
             label_all += label
     label_all = np.array(label_all,dtype='int64')
+
+    feature_all = preprocessing.StandardScaler().fit_transform(feature_all)
     feature_train, feature_validation, label_train, label_validation = \
         train_test_split(feature_all, label_all, test_size=validation_size, stratify=label_all)
 
@@ -374,26 +388,26 @@ if __name__ == '__main__':
     #                           featureFilename='dic_final_feature_train_'+class_name+'.pkl',
     #                           gmmModel_path=gmmModels_path)
 
-    # processAcousticModelTrainPho(class_name=class_name,
-    #                           syllableTierName=syllableTierName,
-    #                           phonemeTierName=phonemeTierName,
-    #                           featureFilename='dic_pho_feature_train_'+class_name+'.pkl',
-    #                           gmmModel_path=gmmModels_path)
+    processAcousticModelTrainPho(class_name=class_name,
+                              syllableTierName=syllableTierName,
+                              phonemeTierName=phonemeTierName,
+                              featureFilename='dic_pho_feature_train_'+class_name+'.pkl',
+                              gmmModel_path=gmmModels_path)
 
 
     # dump feature for DNN training, with getFeature output MFCC bands
-    recordings_train = getRecordingNamesSimi('TRAIN', 'laosheng')
+    # recordings_train = getRecordingNamesSimi('TRAIN', 'laosheng')
+    #
+    # dic_pho_feature_train_laosheng = dumpFeaturePho('laosheng', recordings_train, syllableTierName, phonemeTierName, feature_type='mfccbands')
+    #
+    # feature_train, feature_validation, label_train, label_validation = trainValidationSplit(dic_pho_feature_train_laosheng, validation_size=0.2)
+    #
+    # cPickle.dump((feature_train,label_train),gzip.open('train_set_laosheng_phraseMatching.pickle.gz', 'wb'),cPickle.HIGHEST_PROTOCOL)
+    # cPickle.dump((feature_validation, label_validation), gzip.open('validation_set_laosheng_phraseMatching.pickle.gz', 'wb'), cPickle.HIGHEST_PROTOCOL)
+    #
+    # print feature_train.shape,len(feature_validation),len(label_train),len(label_validation)
 
-    dic_pho_feature_train_laosheng = dumpFeaturePho('laosheng', recordings_train, syllableTierName, phonemeTierName, feature_type='mfccbands')
-
-    feature_train, feature_validation, label_train, label_validation = trainValidationSplit(dic_pho_feature_train_laosheng, validation_size=0.2)
-
-    cPickle.dump((feature_train,label_train),gzip.open('train_set_laosheng_phraseMatching.pickle.gz', 'wb'),cPickle.HIGHEST_PROTOCOL)
-    cPickle.dump((feature_validation, label_validation), gzip.open('validation_set_laosheng_phraseMatching.pickle.gz', 'wb'), cPickle.HIGHEST_PROTOCOL)
-
-    print len(feature_train),len(feature_validation),len(label_train),len(label_validation)
-    print (feature_train,label_train)
-
+    """
     # dump feature danAll
     recordings_train = getRecordingNamesSimi('TRAIN', 'danAll')
 
@@ -407,3 +421,4 @@ if __name__ == '__main__':
 
     with gzip.open('validation_set_danAll_phraseMatching.pkl.gz', 'wb') as f:
         cPickle.dump((feature_validation, label_validation), f)
+    """

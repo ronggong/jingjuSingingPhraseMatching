@@ -236,21 +236,21 @@ def compareMelodicSimiResults(path_largerPyin,list_lessNRank_phrase_name):
 
     return set.intersection(set(phrase_names_largerN),set(list_lessNRank_phrase_name))
 
-def resultAnalysisProcess(method,proportionality_std,am='gmm'):
+def resultAnalysisProcess(method,proportionality_std,am='gmm',dnn_node=''):
     # for cpp in [0.5,1,2,5,10]:
 
     if method == 'lyricsRecognizerHMM':
         path_json_dict_query_phrases = 'results/dict_query_phrases_' \
                                        + method + '_' \
                                        + class_name + '_' \
-                                       + am + '.json'
+                                       + am+dnn_node+ '.json'
         results_path = path.join(currentPath, '..', 'results/lyricsRecognizerHmmDan')
 
     else:
         path_json_dict_query_phrases = 'results/dict_query_phrases_' \
                                        + method + '_' \
                                        + class_name + '_' \
-                                       + am + '_' \
+                                       + am+dnn_node + '_' \
                                        + str(proportionality_std) + '.json'
         results_path = path.join(currentPath, '..', 'results/lyricsRecognizerHsmm')
 
@@ -264,8 +264,8 @@ def resultAnalysisProcess(method,proportionality_std,am='gmm'):
     if method == 'lyricsRecognizerHMM':
 
         cpp = 1.0
-        # for pstd in [0.0, 0.1, 0.25, 0.5, 1.0, 1.25, 1.5, 2.0, 3.0, 4.0, 5.0]:
-        for pstd in [0.0]:
+        for pstd in [0.0, 0.1, 0.25, 0.5, 1.0, 1.25, 1.5, 2.0, 3.0, 4.0, 5.0]:
+        # for pstd in [6.0,7.0]:
 
             list_rank = []
             for key in dict_query_phrases:
@@ -304,7 +304,7 @@ def resultAnalysisProcess(method,proportionality_std,am='gmm'):
                                                           results_path=results_path,
                                                           writecsv=False)
                 list_rank.append(order)
-            calculateMetrics(list_rank, method, cpp, pstd, am)
+            calculateMetrics(list_rank, method, cpp, pstd, am+dnn_node)
 
     elif method == 'lyricsRecognizerHSMM':
         list_rank = []
@@ -326,7 +326,7 @@ def resultAnalysisProcess(method,proportionality_std,am='gmm'):
                                            writecsv=False)
 
             list_rank.append(order)
-            calculateMetrics(list_rank, method, 0, 0, am)
+            calculateMetrics(list_rank, method, 0, proportionality_std, am)
         """
         list_less10Rank = lessNRank(dict_query_phrases.keys(), list_rank,N=3, writecsv=True)
 

@@ -57,7 +57,7 @@ elif class_name == 'laosheng':
     wavDataDir = wav_path_laosheng
     path_melodic_similarity_results = path.join(currentPath,'..','melodicSimilarity','results','900_0.7_pyin')
 
-def generalProcess(method,proportionality_std,am='gmm'):
+def generalProcess(method,proportionality_std,am='gmm',dnn_node=''):
     ##-- method conditions
     if method == 'obsMatrix':
         # gmmModel = gmmModelLoad()
@@ -66,14 +66,14 @@ def generalProcess(method,proportionality_std,am='gmm'):
         path_json_dict_query_phrases = 'results/dict_query_phrases_' \
                                        + method + '_' \
                                        + class_name + '_'\
-                                       + am + '.json'
+                                       + am+dnn_node + '.json'
         # print np.where(mat_trans_comb==1.0)
         # print index_start
     elif method == 'lyricsRecognizerHSMM':
         path_json_dict_query_phrases = 'results/dict_query_phrases_' \
                                        + method + '_' \
                                        + class_name + '_'\
-                                       + am + '_'\
+                                       + am +dnn_node+ '_'\
                                        + str(proportionality_std) + '.json'
     else:
         pass
@@ -89,7 +89,7 @@ def generalProcess(method,proportionality_std,am='gmm'):
         sampleRate, wavData = wavfile.read(path.join(wavDataDir,filename+'.wav'))
         for i, line_list in enumerate(nestedPhonemeLists):
             print filename, i
-            # if filename != 'lsxp-Jiang_shen_er-San_jia_dian01-1-upf' or i != 1:
+            # if filename != 'lsxp-Jiang_shen_er-San_jia_dian01-2-upf' or i != 5:
             #     # bug in this file and this phrase
             #     # stops in time 72
             #     continue
@@ -97,6 +97,9 @@ def generalProcess(method,proportionality_std,am='gmm'):
             # these phrases are not in score corpus
             if (filename == 'lseh-Zi_na_ri-Hong_yang_dong-qm' and i in [4,5]) or \
                 (filename == 'lsxp-Huai_nan_wang-Huai_he_ying02-qm' and i in [0,1,2,3]):
+                continue
+
+            if filename == 'daxp-Jiao_Zhang_sheng-Hong_niang01-qm' and i in [3]:
                 continue
 
             line = line_list[0]
@@ -140,6 +143,7 @@ def generalProcess(method,proportionality_std,am='gmm'):
             elif method == 'lyricsRecognizerHMM':
                 phrases, lyrics_net, mat_trans_comb, state_pho_comb, index_start, index_end, list_centroid_pho_dur \
                     = makeNet(dict_score_100)
+
                 hmm = ParallelLRHMM(lyrics_net,mat_trans_comb,state_pho_comb,index_start,index_end)
                 if am == 'gmm':
                     hmm._gmmModel(gmmModels_path)
@@ -180,6 +184,7 @@ def generalProcess(method,proportionality_std,am='gmm'):
                         'phrases'                               :phrases,
                         'line_lyrics'                           :line_lyrics
                         }
+
 
                 #
                 # with open(path_json_list_sdp_cpd,'r') as openfile:
@@ -227,7 +232,7 @@ def generalProcess(method,proportionality_std,am='gmm'):
                      'phrases':             phrases,
                      'line_lyrics':         line_lyrics}
 
-    with open(path_json_dict_query_phrases,'w') as outfile:
+    with open(path_json_dict_query_phrases,'wb') as outfile:
         json.dump(dict_query_phrases,outfile)
 
     # path_json_dict_query_phrases = 'results/dict_query_phrases_hmm_danAll.json'

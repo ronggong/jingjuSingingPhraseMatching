@@ -106,7 +106,6 @@ class ParallelLRHMM(_LRHMM):
                 #         psi[t][j] = i
                 # print delta[t][j],psi[t][j]
                 # print j,delta[t]
-            print delta[t]
             for j,state in enumerate(self.transcription):
                 delta[t][j] += self.B_map[state][t]
             # raise

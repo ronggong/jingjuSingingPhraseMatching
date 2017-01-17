@@ -8,14 +8,19 @@ sys.path.append(parentPath)
 from scoreManip import retrieveSylInfo
 from general.phonemeMap import *
 from general.pinyinMap import *
+from general.filePath import class_name
 import numpy as np
 from scipy.linalg import block_diag
 
 TRANS_PROB_SELF = 0.9
 TRANS_PROB_NEXT = 1-TRANS_PROB_SELF
 
-with open(os.path.join(currentPath,'dict_centroid_dur.json'),'r') as openfile:
-    dict_centroid_dur = json.load(openfile)
+if class_name == 'laosheng':
+    with open(os.path.join(currentPath,'dict_centroid_dur_laosheng.json'),'r') as openfile:
+        dict_centroid_dur = json.load(openfile)
+elif class_name == 'danAll':
+    with open(os.path.join(currentPath,'dict_centroid_dur_danAll.json'),'r') as openfile:
+        dict_centroid_dur = json.load(openfile)
 
 def singleTransMatBuild(dict_score_info):
     '''
@@ -77,6 +82,7 @@ def multiTransMats(dict_score_infos):
     states_pho = []
     list_centroid_pho_durs = []
     for key in dict_score_infos:
+        # print key
         mat_trans,state_pho,centroid_pho_durs = singleTransMatBuild(dict_score_infos[key])
         phrases.append(key)
         lyrics.append(dict_score_infos[key]['lyrics'])

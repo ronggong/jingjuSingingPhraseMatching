@@ -131,7 +131,7 @@ def runProcess(pyin=False,
                 print filename,'done'
 
                 if roleTypeWeight:
-                    role_type = dict_score[key]['role_type']
+                    role_type = dict_score[key]['roletype']
                     if role_type == 'laosheng':
                         dist_weight = dist_weight_laosheng
                     else:

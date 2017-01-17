@@ -48,8 +48,8 @@ def discardPitch(pitch,pitchConfidence,low_threshold_pitch,high_threshold_pitch,
     '''
     index_keep = []
     for ii in range(len(pitch)):
-        if not (pitchConfidence[ii] > threshold_confidence \
-                and pitch[ii] >low_threshold_pitch \
+        if not (pitchConfidence[ii] > threshold_confidence
+                and pitch[ii] > low_threshold_pitch
                 and pitch[ii] < high_threshold_pitch):
             index_keep.append(ii)
 
@@ -61,6 +61,8 @@ def mfccFeature_audio(filename_wav,index_keep,feature_type='mfcc'):
         feature             = getFeature(audio)
     else:
         feature             = getMFCCBands(audio)
+        # MFCC bands feature for dnn acoustic model needs to be scaled on mean and std
+        feature             = preprocessing.StandardScaler().fit_transform(feature)
     # feature             = preprocessing.StandardScaler().fit_transform(feature)
     index_keep          = pitchProcessing_audio(filename_wav)
     feature_out         = feature[index_keep[0],:]

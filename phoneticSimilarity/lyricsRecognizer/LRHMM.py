@@ -111,6 +111,8 @@ class _LRHMM(object):
 
         obs = np.log(obs)
 
+        # print obs.shape, observations.shape
+
         self.B_map = {}
         # print self.transcription, self.B_map.shape
         for ii in xrange(obs.shape[1]):

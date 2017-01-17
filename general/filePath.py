@@ -5,6 +5,8 @@ root_path    = join(dirname(__file__),'..')
 class_name = 'danAll'
 # class_name = 'laosheng'
 
+dnn_node = '1_64FD5MB80'
+
 if class_name == 'danSource':
     base_path = 'sourceSeparation'
     syllableTierName = 'pinyin'
@@ -14,17 +16,17 @@ elif class_name == 'danAll':
     gmmModels_path = join(root_path, 'phoneticSimilarity', 'gmmModels/dan')
     dnnModels_path = join(root_path, 'phoneticSimilarity', 'dnnModels/dan')
     dnnModels_cfg_path = join(root_path, 'phoneticSimilarity',
-                              'dnnModels/dan/dnn_danAll_phraseMatching_layers_2_512.cfg')
+                              'dnnModels/dan/dnn_danAll_phraseMatching_layers_'+dnn_node+'.cfg')
     dnnModels_param_path = join(root_path, 'phoneticSimilarity',
-                              'dnnModels/dan/dnn_danAll_phraseMatching_layers_2_512.param')
+                              'dnnModels/dan/dnn_danAll_phraseMatching_layers_'+dnn_node+'.param')
 elif class_name == 'laosheng':
     base_path = 'qmLonUpf/laosheng'
     syllableTierName = 'dian'
     gmmModels_path = join(root_path, 'phoneticSimilarity', 'gmmModels/laosheng')
     dnnModels_cfg_path = join(root_path, 'phoneticSimilarity',
-                              'dnnModels/laosheng/dnn_laosheng_phraseMatching_layers_2_512.cfg')
+                              'dnnModels/laosheng/dnn_laosheng_phraseMatching_layers_'+dnn_node+'.cfg')
     dnnModels_param_path = join(root_path, 'phoneticSimilarity',
-                              'dnnModels/laosheng/dnn_laosheng_phraseMatching_layers_2_512.param')
+                              'dnnModels/laosheng/dnn_laosheng_phraseMatching_layers_'+dnn_node+'.param')
 phonemeTierName = 'details'
 
 dataset_path = '/Users/gong/Documents/MTG document/Jingju arias/phonemeSeg/'
