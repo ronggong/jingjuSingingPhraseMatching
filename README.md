@@ -10,10 +10,7 @@ The related code only situated in **phoneticSimilarity** folder. Other folders a
 1. Clone this repository
 2. Download Jingju a capella singing dataset from http://doi.org/10.5281/zenodo.344932
 3. Change `dataset_path` variable in `general/filePath.py` to locate the above dataset
-4. Compile cython viterbi decoding code: go into `CythonModule`, in terminal type
-```
-python setup.py build_ext --inplace
-```
+4. Compile cython viterbi decoding code: go into `CythonModule`, in terminal type `python setup.py build_ext --inplace`
 5. Install dependencies (see below)
 6. Choose `class_name` in `general/filePath.py` to `'danAll'` or `'laosheng'` to experiment on either dan or laosheng role-type
 7. Choose `am ` in `general/parameters.py` to `'gmm'` or `'cnn'` to select acoustic model
