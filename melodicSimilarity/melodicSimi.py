@@ -126,16 +126,28 @@ def plot3Pitch(pitch_query,
     # axarr[2].plot(pitch_match)
     # axarr[2].set_title('best match pitch track')
 
-    plt.figure()
+    plt.figure(figsize=(8,4))
+    ax = plt.subplot(111)
     plt.plot(np.array(pitch_query)+700,label='query pitch track')
     plt.plot(np.array(pitch_groundtruth),linestyle = '--',label='ground truth pitch track')
     plt.plot(np.array(pitch_match)-700,linestyle = ':',label='best match pitch track')
-    plt.legend(loc='best')
-    plt.gca().axes.get_yaxis().set_ticks([])
-    plt.xlabel('sample')
-    plt.title(query_phrase_name+'\n ground truth pitch track ranking: '+str(gt_rank))
+
+    # for plot the figure for ISMIR paper
+    # ax.plot(np.array(pitch_query) + 700, linewidth = 3, label='Query phrase F0 contour')
+    # ax.plot(np.array(pitch_groundtruth), linestyle='--', linewidth = 3, label='Score 1 F0 contour')
+    # ax.plot(np.array(pitch_match) - 700, linestyle=':', linewidth = 3, label='Score 2 F0 contour')
+
+    ax.legend(loc='upper center', bbox_to_anchor=(0.48, 1.2),
+                    fancybox=True, shadow=True, ncol=2)
+    ax.get_yaxis().set_ticks([])
+    ax.set_xlim([0,sample_number_total])
+    plt.xlabel('Sample')
+    plt.tight_layout()
+    plt.subplots_adjust(top=0.85)
+
+    # plt.title(query_phrase_name+'\n ground truth pitch track ranking: '+str(gt_rank))
     if save_fig:
-        plt.savefig(path.join(path_fig,name_fig+'_query_gt_bm.png'))
+        plt.savefig(path.join(path_fig,name_fig+'_query_gt_bm.png'),bbox_inches='tight')
     else:
         plt.show()
 

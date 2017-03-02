@@ -1,7 +1,7 @@
 '''
- * Copyright (C) 2016  Music Technology Group - Universitat Pompeu Fabra
+ * Copyright (C) 2017  Music Technology Group - Universitat Pompeu Fabra
  *
- * This file is part of jingjuPhoneticSegmentationHMM
+ * This file is part of jingjuSingingPhraseMatching
  *
  * pypYIN is free software: you can redistribute it and/or modify it under
  * the terms of the GNU Affero General Public License as published by the Free
@@ -28,6 +28,11 @@ import os
 
 
 def getRecordings(wav_path):
+    """
+    retrieve the filename from wav_path
+    :param wav_path: not necessarily only contain .wav
+    :return:
+    """
     recordings      = []
     for root, subFolders, files in os.walk(wav_path):
             for f in files:
@@ -38,7 +43,12 @@ def getRecordings(wav_path):
     return recordings
 
 def getRecordingNames(train_test_string,mode):
-
+    """
+    reserved for other usage
+    :param train_test_string:
+    :param mode:
+    :return:
+    """
     if mode == 'laosheng':
         recordings_train = ['lseh-Tan_Yang_jia-Hong_yang_dong-qm', 'lseh-Wei_guo_jia-Hong_yang_dong01-lon', 'lseh-Wei_guo_jia-Hong_yang_dong02-qm', 'lseh-Yi_lun_ming-Wen_zhao_guan-qm', 'lseh-Zi_na_ri-Hong_yang_dong-qm', 'lsfxp-Yang_si_lang-Si_lang_tan_mu-lon', 'lsxp-Huai_nan_wang-Huai_he_ying01-lon', 'lsxp-Jiang_shen_er-San_jia_dian02-qm', 'lsxp-Qian_bai_wan-Si_lang_tang_mu01-qm', 'lsxp-Quan_qian_sui-Gan_lu_si-qm', 'lsxp-Shen_gong_wu-Gan_lu_si-qm', 'lsxp-Shi_ye_shuo-Ding_jun_shan-qm', 'lsxp-Wo_ben_shi-Kong_cheng_ji-qm', 'lsxp-Wo_zheng_zai-Kong_cheng_ji01-upf', 'lsxp-Wo_zheng_zai-Kong_cheng_ji04-qm', 'lsxp-Xi_ri_you-Zhu_lian_zhai-qm']
         recordings_test  = ['lseh-Wo_ben_shi-Qiong_lin_yan-qm', 'lsxp-Guo_liao_yi-Wen_zhao_guan-qm', 'lsxp-Guo_liao_yi-Wen_zhao_guan-upf', 'lsxp-Huai_nan_wang-Huai_he_ying02-qm', 'lsxp-Jiang_shen_er-San_jia_dian01-1-upf', 'lsxp-Jiang_shen_er-San_jia_dian01-2-upf', 'lsxp-Wo_zheng_zai-Kong_cheng_ji02-qm']
@@ -55,8 +65,8 @@ def getRecordingNames(train_test_string,mode):
 
 def getRecordingNamesSimi(train_test,mode):
     '''
-    these recordings are in score corpus
-    :param mode:
+    return recordings names, test recordings in score dataset
+    :param mode: role type
     :return:
     '''
     if mode == 'laosheng':
@@ -87,9 +97,6 @@ def getRecordingNamesSimi(train_test,mode):
                       'lsxp-Shen_gong_wu-Gan_lu_si-qm',
                       'lsxp-Wo_ben_shi-Kong_cheng_ji-qm']
     elif mode == 'danAll':
-
-        # recordings_train = ['shiwenhui_tingxiongyan', 'wangjiangting_zhijianta', 'xixiangji_diyilai', 'xixiangji_luanchouduo', 'xixiangji_manmufeng', 'xixiangji_zhenmeijiu', 'yutangchun_yutangchun', 'zhuangyuanmei_daocishi', 'zhuangyuanmei_tianbofu', 'zhuangyuanmei_zhenzhushan', 'zhuangyuanmei_zinari']
-        # recordings_test  = ['wangjiangting_dushoukong', 'xixiangji_biyuntian', 'xixiangji_xianzhishuo', 'zhuangyuanmei_fudingkui']
 
         recordings_train = ['daspd-Du_shou_kong-Wang_jiang_ting-upf',
                             'daeh-Bie_yuan_zhong-Mei_fei-qm',

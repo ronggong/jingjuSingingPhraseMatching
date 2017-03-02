@@ -1,6 +1,32 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
+'''
+ * Copyright (C) 2017  Music Technology Group - Universitat Pompeu Fabra
+ *
+ * This file is part of jingjuSingingPhraseMatching
+ *
+ * pypYIN is free software: you can redistribute it and/or modify it under
+ * the terms of the GNU Affero General Public License as published by the Free
+ * Software Foundation (FSF), either version 3 of the License, or (at your
+ * option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+ * FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more
+ * details.
+ *
+ * You should have received a copy of the Affero GNU General Public License
+ * version 3 along with this program.  If not, see http://www.gnu.org/licenses/
+ *
+ * If you have any problem about this python version code, please contact: Rong Gong
+ * rong.gong@upf.edu
+ *
+ *
+ * If you want to refer this code, please use this article:
+ *
+'''
+
 import os
 import pickle,cPickle,gzip
 
@@ -11,19 +37,21 @@ from sklearn.model_selection import train_test_split
 import essentia.standard as ess
 
 from general.textgridParser import syllableTextgridExtraction
-# from src.trainTestSeparation import getRecordings, getRecordingNumber
 from general.trainTestSeparation import getRecordingNamesSimi
 from general.parameters import *
 from general.Fdeltas import Fdeltas
-from general.pinyinMap import *
+from general.Fprev_sub import Fprev_sub
 from general.phonemeMap import *
 from general.filePath import *
 
 
+from general.pinyinMap import *
+# from src.trainTestSeparation import getRecordings, getRecordingNumber
+
 ##-- number of Mel bands used in MFCC function
 if am == 'gmm':
     numberBands = 40
-elif am == 'dnn':
+elif am == 'cnn':
     numberBands = 80
 else:
     raise('am acoustic model param is not exist.')
@@ -63,10 +91,10 @@ def getFeature(audio):
 
     return feature
 
-def getMFCCBands(audio):
+def getMFCCBands1D(audio):
 
     '''
-    MFCC bands feature [p[0],p[1]], this function only for pdnn acoustic model training
+    MFCC bands feature [p[0],p[1]], this function only for DNN acoustic model training
     it needs the array format float32
     :param audio:
     :param p:
@@ -86,9 +114,44 @@ def getMFCCBands(audio):
 
     return feature
 
+def getMFCCBands2D(audio, nbf=False, nlen=10):
+
+    '''
+    mel bands feature [p[0],p[1]]
+    output feature for each time stamp is a 2D matrix
+    it needs the array format float32
+    :param audio:
+    :param p:
+    :param nbf: bool, if we need to neighbor frames
+    :return:
+    '''
+
+    mfcc   = []
+    # audio_p = audio[p[0]*fs:p[1]*fs]
+    for frame in ess.FrameGenerator(audio, frameSize=framesize_phoneticSimilarity, hopSize=hopsize_phoneticSimilarity):
+        frame           = WINDOW(frame)
+        mXFrame         = SPECTRUM(frame)
+        bands,mfccFrame = MFCC(mXFrame)
+        mfcc.append(bands)
+
+    if nbf:
+        mfcc = np.array(mfcc).transpose()
+        mfcc_out = np.array(mfcc, copy=True)
+        for ii in range(1,nlen+1):
+            mfcc_right_shift    = Fprev_sub(mfcc, w=ii)
+            mfcc_left_shift     = Fprev_sub(mfcc, w=-ii)
+            mfcc_out = np.vstack((mfcc_right_shift, mfcc_out, mfcc_left_shift))
+        feature = mfcc_out.transpose()
+    else:
+        feature = mfcc
+    # the mel bands features
+    feature = np.array(feature,dtype='float32')
+
+    return feature
+
 def getMBE(audio):
     '''
-    mel band energy feature
+    mel band energy feature, for some other usage
     :param audio:
     :return:
     '''
@@ -103,60 +166,27 @@ def getMBE(audio):
     feature         = np.array(mfccBands)
     return feature
 
-def dumpFeature(class_name,recordings,syllableTierName,phonemeTierName):
-    '''
-    dump the MFCC for each final
-    :param recordings:
+def featureReshape(feature):
+    """
+    reshape mfccBands feature into n_sample * n_row * n_col
+    :param feature:
     :return:
-    '''
+    """
 
-    if class_name == 'danAll':
-        textgrid_path = textgrid_path_dan
-        wav_path    = wav_path_dan
-    elif class_name == 'laosheng':
-        textgrid_path = textgrid_path_laosheng
-        wav_path = wav_path_laosheng
+    n_sample = feature.shape[0]
+    n_row = 80
+    n_col = 21
 
-    ##-- dictionary feature
-    dic_final_feature = {}
+    feature_reshaped = np.zeros((n_sample,n_row,n_col),dtype='float32')
 
-    for final in finals:
-        dic_final_feature[final] = np.array([])
+    for ii in range(n_sample):
+        # print ii
+        feature_frame = np.zeros((n_row,n_col),dtype='float32')
+        for jj in range(n_col):
+            feature_frame[:,jj] = feature[ii][n_row*jj:n_row*(jj+1)]
+        feature_reshaped[ii,:,:] = feature_frame
+    return feature_reshaped
 
-    for recording in recordings:
-        nestedPhonemeLists, numSyllables, numPhonemes   \
-            = syllableTextgridExtraction(textgrid_path,recording,syllableTierName,phonemeTierName)
-
-        # audio
-        wav_full_filename   = os.path.join(wav_path,recording+'.wav')
-        audio               = ess.MonoLoader(downmix = 'left', filename = wav_full_filename, sampleRate = fs)()
-
-        # MFCC feature
-        mfcc = getFeature(audio)
-
-        # mfcc = preprocessing.StandardScaler().fit_transform(mfcc)
-
-        for ii,syl in enumerate(nestedPhonemeLists):
-            print 'calculating ', recording, ' and syl ', str(ii), ' of ', str(len(nestedPhonemeLists))
-            # map from annotated xsampa to readable notation
-            key = dic_pinyin_2_initial_final_map[syl[0][2]]['final']
-            print key
-            for p in syl[1]:
-
-                if p[2] in ['c','m','l','x','f','k',"r\'",'']:
-                    continue
-
-                sf = round(p[0] * fs / float(hopsize_phoneticSimilarity)) # starting frame
-                ef = round(p[1] * fs / float(hopsize_phoneticSimilarity)) # ending frame
-
-                mfcc_p = mfcc[sf:ef,:]  # phoneme syllable
-
-                if not len(dic_final_feature[key]):
-                    dic_final_feature[key] = mfcc_p
-                else:
-                    dic_final_feature[key] = np.vstack((dic_final_feature[key],mfcc_p))
-
-    return dic_final_feature
 
 def dumpFeaturePho(class_name,recordings,syllableTierName,phonemeTierName,feature_type='mfcc'):
     '''
@@ -190,7 +220,7 @@ def dumpFeaturePho(class_name,recordings,syllableTierName,phonemeTierName,featur
             mfcc = getFeature(audio)
         elif feature_type == 'mfccbands':
             # MFCC energy bands feature
-            mfcc = getMFCCBands(audio)
+            mfcc = getMFCCBands1D(audio)
         else:
             raise('feature type not exists, either mfcc or mfccbands.')
 
@@ -280,56 +310,10 @@ def modelSelection(featureFilename):
 
         print 'The best n_components for',key,'is',str(best_n_components)
 
-def processAcousticModelTrain(class_name,syllableTierName,phonemeTierName,featureFilename,gmmModel_path):
-    '''
-
-    :param mode: sourceSeparation, qmLonUpfLaosheng
-    :param syllableTierName: 'pinyin', 'dian'
-    :param phonemeTierName: 'details'
-    :param featureFilename: 'dic_pho_feature_train.pkl'
-    :param gmmModel_path: in parameters.py
-    :return:
-    '''
-
-    # model training
-    recordings_train = getRecordingNamesSimi('TRAIN',class_name)
-
-    dic_final_feature_train = dumpFeature(class_name,recordings_train,syllableTierName,phonemeTierName)
-
-    output = open(featureFilename, 'wb')
-    pickle.dump(dic_final_feature_train, output)
-    output.close()
-
-    # model loading
-    pkl_file = open(featureFilename, 'rb')
-    dic_final_feature_train = pickle.load(pkl_file)
-    pkl_file.close()
-
-    g = mixture.GaussianMixture(n_components=5,covariance_type='diag')
-
-    print len(dic_final_feature_train.keys())
-    for ii,key in enumerate(dic_final_feature_train):
-        # print key, dic_pho_feature_train[key].shape
-
-        print 'fitting gmm ', key, ' ', str(ii), ' of ', str(len(dic_final_feature_train.keys()))
-
-        ##-- try just fit the first dim of MFCC
-        # x = np.expand_dims(dic_pho_feature_train[key][:,0],axis=1)
-
-        x = dic_final_feature_train[key]
-        print x.shape
-        if x.shape[0] == 0:
-            print('not fit this final')
-            continue
-        g.fit(x)
-
-        output = open(os.path.join(gmmModel_path,key+'.pkl'),'wb')
-        pickle.dump(g, output)
-        output.close()
 
 def processAcousticModelTrainPho(class_name,syllableTierName,phonemeTierName,featureFilename,gmmModel_path):
     '''
-
+    Monophonic acoustic model training
     :param mode: sourceSeparation, qmLonUpfLaosheng
     :param syllableTierName: 'pinyin', 'dian'
     :param phonemeTierName: 'details'
@@ -337,9 +321,6 @@ def processAcousticModelTrainPho(class_name,syllableTierName,phonemeTierName,fea
     :param gmmModel_path: in parameters.py
     :return:
     '''
-    # recordings      = getRecordings(textgrid_path)
-    # number_train    = getRecordingNumber('TRAIN',mode)
-    # recordings_train = [recordings[i] for i in number_train]
 
     # model training
     recordings_train = getRecordingNamesSimi('TRAIN',class_name)
@@ -382,32 +363,35 @@ def processAcousticModelTrainPho(class_name,syllableTierName,phonemeTierName,fea
 
 if __name__ == '__main__':
 
-    # processAcousticModelTrain(class_name=class_name,
-    #                           syllableTierName=syllableTierName,
-    #                           phonemeTierName=phonemeTierName,
-    #                           featureFilename='dic_final_feature_train_'+class_name+'.pkl',
-    #                           gmmModel_path=gmmModels_path)
+    rp = os.path.dirname(__file__)
 
-    processAcousticModelTrainPho(class_name=class_name,
-                              syllableTierName=syllableTierName,
-                              phonemeTierName=phonemeTierName,
-                              featureFilename='dic_pho_feature_train_'+class_name+'.pkl',
-                              gmmModel_path=gmmModels_path)
+    for cn in ['danAll', 'laosheng']:
+        if cn == 'danAll':
+            gmmModels_path = os.path.join(rp, 'gmmModels/dan')
+        elif cn == 'laosheng':
+            gmmModels_path = os.path.join(rp, 'gmmModels/laosheng')
 
-
-    # dump feature for DNN training, with getFeature output MFCC bands
-    # recordings_train = getRecordingNamesSimi('TRAIN', 'laosheng')
-    #
-    # dic_pho_feature_train_laosheng = dumpFeaturePho('laosheng', recordings_train, syllableTierName, phonemeTierName, feature_type='mfccbands')
-    #
-    # feature_train, feature_validation, label_train, label_validation = trainValidationSplit(dic_pho_feature_train_laosheng, validation_size=0.2)
-    #
-    # cPickle.dump((feature_train,label_train),gzip.open('train_set_laosheng_phraseMatching.pickle.gz', 'wb'),cPickle.HIGHEST_PROTOCOL)
-    # cPickle.dump((feature_validation, label_validation), gzip.open('validation_set_laosheng_phraseMatching.pickle.gz', 'wb'), cPickle.HIGHEST_PROTOCOL)
-    #
-    # print feature_train.shape,len(feature_validation),len(label_train),len(label_validation)
+        processAcousticModelTrainPho(class_name=cn,
+                                      syllableTierName='dian',
+                                      phonemeTierName='details',
+                                      featureFilename='./gmmModels/dic_pho_feature_train_'+cn+'.pkl',
+                                      gmmModel_path=gmmModels_path)
 
     """
+    # dump feature for DNN training, with getFeature output MFCC bands
+    # not used
+    recordings_train = getRecordingNamesSimi('TRAIN', 'laosheng')
+
+    dic_pho_feature_train_laosheng = dumpFeaturePho('laosheng', recordings_train, syllableTierName, phonemeTierName, feature_type='mfccbands')
+
+    feature_train, feature_validation, label_train, label_validation = trainValidationSplit(dic_pho_feature_train_laosheng, validation_size=0.2)
+
+    cPickle.dump((feature_train,label_train),gzip.open('train_set_laosheng_phraseMatching.pickle.gz', 'wb'),cPickle.HIGHEST_PROTOCOL)
+    cPickle.dump((feature_validation, label_validation), gzip.open('validation_set_laosheng_phraseMatching.pickle.gz', 'wb'), cPickle.HIGHEST_PROTOCOL)
+
+    print feature_train.shape,len(feature_validation),len(label_train),len(label_validation)
+
+
     # dump feature danAll
     recordings_train = getRecordingNamesSimi('TRAIN', 'danAll')
 

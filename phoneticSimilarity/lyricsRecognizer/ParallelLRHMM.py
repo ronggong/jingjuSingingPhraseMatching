@@ -1,3 +1,29 @@
+'''
+ * Copyright (C) 2017  Music Technology Group - Universitat Pompeu Fabra
+ *
+ * This file is part of jingjuSingingPhraseMatching
+ *
+ * pypYIN is free software: you can redistribute it and/or modify it under
+ * the terms of the GNU Affero General Public License as published by the Free
+ * Software Foundation (FSF), either version 3 of the License, or (at your
+ * option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+ * FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more
+ * details.
+ *
+ * You should have received a copy of the Affero GNU General Public License
+ * version 3 along with this program.  If not, see http://www.gnu.org/licenses/
+ *
+ * If you have any problem about this python version code, please contact: Rong Gong
+ * rong.gong@upf.edu
+ *
+ *
+ * If you want to refer this code, please use this article:
+ *
+'''
+
 import numpy as np
 import time
 import matplotlib.pyplot as plt
@@ -15,11 +41,13 @@ sys.path.append(parentPath)
 
 from helpFuncs import viterbiLoopHelperCython
 
+
 def transcriptionMapping(transcription):
     transcription_maped = []
     for t in transcription:
         transcription_maped.append(dic_pho_map[t])
     return transcription_maped
+
 
 class ParallelLRHMM(_LRHMM):
 
@@ -50,7 +78,7 @@ class ParallelLRHMM(_LRHMM):
     # def _makeNet(self):
     #     pass
 
-    def _viterbiLog(self, observations, am='gmm'):
+    def _viterbiLog(self, observations, am='gmm', kerasModel=None):
         '''
         Find the best state sequence (path) using viterbi algorithm - a method of dynamic programming,
         very similar to the forward-backward algorithm, with the added step of maximization and eventual
@@ -65,8 +93,9 @@ class ParallelLRHMM(_LRHMM):
         # similar to the forward-backward algorithm, we need to make sure that we're using fresh data for the given observations.
         if am == 'gmm':
             self._mapBGMM(observations)
-        elif am == 'dnn':
-            self._mapBDNN(observations)
+        elif am == 'cnn':
+            # self._mapBDNN(observations)
+            self._mapBKeras(observations,kerasModel=kerasModel)
 
         pi_log  = np.log(self.pi)
         A_log   = np.log(self.A)
@@ -78,6 +107,7 @@ class ParallelLRHMM(_LRHMM):
 
         # init
         for x,state in enumerate(self.transcription):
+            # print state
             delta[0][x] = pi_log[x]+self.B_map[state][0]
             psi[0][x] = 0
         # print delta[0][:]
@@ -92,38 +122,15 @@ class ParallelLRHMM(_LRHMM):
             A_log_in                = A_log
             delta_t_in              = delta[t,:]
             psi_t_in                = psi[t,:]
-            # for j in xrange(self.n):
-            #     delta_t_minus_one_in    = delta[t-1,:]
-            #     A_log_j_in              = A_log[:,j]
-            #     # print A_log_j_in
-            #     delta_t_j_in            = delta[t][j]
-            #     psi_t_j_in              = psi[t][j]
 
+            # looping written in cython for accelerating
             delta[t,:],psi[t,:]   = viterbiLoopHelperCython(delta_t_minus_one_in,A_log_in,delta_t_in,psi_t_in)
-                # for i in xrange(self.n):
-                #     if (delta[t][j] < delta[t-1][i] + A_log[i][j]):
-                #         delta[t][j] = delta[t-1][i] + A_log[i][j]
-                #         psi[t][j] = i
-                # print delta[t][j],psi[t][j]
-                # print j,delta[t]
+
             for j,state in enumerate(self.transcription):
                 delta[t][j] += self.B_map[state][t]
             # raise
 
-        # with open('results/lyricsRecognizer/delta_end.json','w') as outfile:
-        #     json.dump(delta[len(observations)-1].tolist(),outfile)
 
-
-        # termination: find the maximum probability for the entire sequence (=highest prob path)
-        # p_max   = -float("inf") # max value in time T (max)
-        # path    = np.zeros((len(observations)),dtype=self.precision)
-
-        # last path is self.n-1
-        # path[len(observations)-1] = self.n-1
-        # for i in xrange(self.n):
-        #     if (p_max < delta[len(observations)-1][i]):
-        #         p_max = delta[len(observations)-1][i]
-        #         path[len(observations)-1] = i
         posteri_probs = np.zeros((len(self.idx_final_tail),),dtype=self.precision)
         paths = []
         counter_posteri = 0

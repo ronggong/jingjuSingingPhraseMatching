@@ -43,7 +43,7 @@ def larger3Plot(list_rank_best,
                 save_fig=False,
                path_fig=None):
     '''
-    plot rank larger than 3 query, ground truth and best match pitch tracks, dtw alignment
+    plot the query rank larger than 3, ground truth and best match pitch tracks, dtw alignment
     :param dict_query_pitchtracks:
     :param path_results:
     :param path_results_dtw_align:
@@ -220,7 +220,10 @@ error_phrases = larger3Plot(list_rank_best_pyin_roletypeWeight,
                             save_fig=False,
                             path_fig=path_fig)
 
+"""
+# save for error analysis
 with open('errorAnalysis/larger10pyinRoletypeWeight.csv','wb') as csvfile:
     w = csv.writer(csvfile)
     for ep in error_phrases:
         w.writerow([ep['query_phrase_name'],ep['groundtruth_rank']])
+"""

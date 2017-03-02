@@ -1,25 +1,59 @@
+'''
+ * Copyright (C) 2017  Music Technology Group - Universitat Pompeu Fabra
+ *
+ * This file is part of jingjuSingingPhraseMatching
+ *
+ * pypYIN is free software: you can redistribute it and/or modify it under
+ * the terms of the GNU Affero General Public License as published by the Free
+ * Software Foundation (FSF), either version 3 of the License, or (at your
+ * option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+ * FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more
+ * details.
+ *
+ * You should have received a copy of the Affero GNU General Public License
+ * version 3 along with this program.  If not, see http://www.gnu.org/licenses/
+ *
+ * If you have any problem about this python version code, please contact: Rong Gong
+ * rong.gong@upf.edu
+ *
+ *
+ * If you want to refer this code, please use this article:
+ *
+'''
+
+"""
+This .py contains the processing pipline for two methods: HMM and HSMM.
+
+post-processor duration modelling is not included here instead in lyricsRecognizer/resultAnalysis.py
+because it's a kind of post-processing after the state sequence decoding has been done
+
+generalProcess funtion gets input of incoming query audio files, segment them into phrase
+phraseProcess function takes over these segmented phrases and do matching
+
+There are some obsolete method here, 'obsMatrix', 'candidateSynthesizeData'
+These are the previous experimentation of different matching methods, which didn't work
+
+The output ranking results is stored in path_json_dict_query_phrases
+"""
+
 from os import path
 import sys
 import json
 import pickle
-# import unicodecsv as csv
 import numpy as np
 
-currentPath = path.dirname(__file__)
+currentPath = path.dirname(path.abspath(__file__))
 lyricsRecognizerPath = path.join(currentPath, 'lyricsRecognizer')
 sys.path.append(lyricsRecognizerPath)
 
-from general.trainTestSeparation import getRecordingNamesSimi
+# from general.trainTestSeparation import getRecordingNamesSimi
 from general.textgridParser import syllableTextgridExtraction
-from general.filePath import *
-# from general.eval import *
 from general.parameters import list_N_frames,hopsize_phoneticSimilarity
-# from general.dtwSankalp import dtwNd
-# from targetAudioProcessing import gmmModelLoad,obsMPlot,obsMPlotPho,obsMatrix
 from targetAudioProcessing import gmmPhoModelLoad,processFeature,obsMatrixPho
-# from scoreManip import scoreMSynthesize,scoreMSynthesizePho,mfccSynthesizeFromData,mfccSynthesizeFromGMM,plotMFCC
-# from tailsMFCCTrain import loadMFCCTrain
-
+from general.filePath import *
 
 from ParallelLRHMM import ParallelLRHMM
 from makeNet import makeNet
@@ -32,20 +66,25 @@ from ParallelLRHSMM import ParallelLRHSMM
 from makeHSMMNet import makeHSMMNet
 
 from scoreDictFilter import runDictScoreRankNFilter
-from resultAnalysis import evalOnSinglefilePostProcessor,sumLogDurProbs,calculateMetrics
 from scipy.io import wavfile
+
+# from scoreManip import scoreMSynthesize,scoreMSynthesizePho,mfccSynthesizeFromData,mfccSynthesizeFromGMM,plotMFCC
+# from tailsMFCCTrain import loadMFCCTrain
+# from general.dtwSankalp import dtwNd
+# from targetAudioProcessing import gmmModelLoad,obsMPlot,obsMPlotPho,obsMatrix
 # from fastdtw import fastdtw
 # from scipy.spatial.distance import euclidean
 # from operator import itemgetter
+# from resultAnalysis import evalOnSinglefilePostProcessor,sumLogDurProbs,calculateMetrics
 
-
-with open('../melodicSimilarity/scores.json','r') as f:
+# load score json, pre-computed
+with open(path.join(currentPath, '../melodicSimilarity/scores.json'),'r') as f:
     dict_score = json.load(f)
 
-dist_measures = ['euclideanDist','sankalpNdDTW121']
-dm = dist_measures[1]
+dist_measures   = ['euclideanDist','sankalpNdDTW121']
+dm              = dist_measures[1]
 
-# class name conditions
+# load textgrid, wav paths, load melodic similarity results
 if class_name == 'danAll':
     textgridDataDir = textgrid_path_dan
     wavDataDir = wav_path_dan
@@ -57,44 +96,171 @@ elif class_name == 'laosheng':
     wavDataDir = wav_path_laosheng
     path_melodic_similarity_results = path.join(currentPath,'..','melodicSimilarity','results','900_0.7_pyin')
 
-def generalProcess(method,proportionality_std,am='gmm',dnn_node=''):
+def phraseProcess(filename,
+                  i,
+                  line_list,
+                  wavData,
+                  gmmModel,
+                  kerasModel,
+                  sampleRate,
+                  method,
+                  proportionality_std=0):
+    # sub module to process each phrase
+
+    line = line_list[0]
+    start_frame = int(round(line[0] * sampleRate))
+    end_frame = int(round(line[1] * sampleRate))
+    line_lyrics = line[2]
+
+    wav_line = wavData[start_frame:end_frame]
+    wavfile.write('temp.wav', sampleRate, wav_line)
+
+    # choose feature type as mfcc or mfccBands for GMM or DNN
+    if am == 'gmm':
+        mfcc_target = processFeature('temp.wav', feature_type='mfcc')
+    elif am == 'cnn':
+        mfcc_target = processFeature('temp.wav', feature_type='mfccBands2D')
+
+    N_frame         = mfcc_target.shape[0]
+    duration_target = (N_frame * hopsize_phoneticSimilarity) / float(sampleRate)
+
+    # only examine on the first N ranking results of melodic similarity
+    query_phrase_name   = filename + '_' + str(i)
+    dict_score_100      = runDictScoreRankNFilter(dict_score,
+                                                 path_melodic_similarity_results,
+                                                 query_phrase_name,
+                                                 N=100)
+    # print 'dict_score_100 len:',len(dict_score_100)
+
+    if method == 'obsMatrix':
+        # not used
+        obsM = obsMatrixPho(mfcc_target, gmmModel)  # pho gmm
+        obsM = np.exp(obsM)
+        obsM = obsM / np.sum(obsM, axis=0)
+        print obsM
+    elif method == 'candidateSynthesizeData':
+        # not used
+        # choose the template which has the nearest length of the target mfcc
+        index_template = np.argmin(np.abs((np.array(list_N_frames) - N_frame)))
+        output = open('syllable_mfcc_templates/dic_mfcc_synthesized_' + str(list_N_frames[index_template]) + '.pkl', 'r')
+        dic_mfcc_synthesized = pickle.load(output)
+        output.close()
+
+    elif method == 'lyricsRecognizerHMM':
+
+        # build matching network from the score dataset
+        phrases, \
+        lyrics_net, \
+        mat_trans_comb, \
+        state_pho_comb, \
+        index_start, \
+        index_end, \
+        list_centroid_pho_dur = makeNet(dict_score_100)
+
+        hmm = ParallelLRHMM(lyrics_net,
+                            mat_trans_comb,
+                            state_pho_comb,
+                            index_start,
+                            index_end)
+        if am == 'gmm':
+            hmm._gmmModel(gmmModels_path)
+
+        # viterbi decoding
+        paths_hmm, posteri_probas = hmm._viterbiLog(observations=mfcc_target, am=am, kerasModel=kerasModel)
+        # best_match_lyrics = hmm._getBestMatchLyrics(path_hmm)
+
+        # aggregate output for result anaylsis
+        list_state_dur_path_centroid_pho_durs = []
+        for ii_path in xrange(len(paths_hmm)):
+            path_ii = paths_hmm[ii_path]
+            state_dur_path = hmm._pathStateDur(path_ii)
+
+            centroid_pho_durs = list_centroid_pho_dur[ii_path]
+            centroid_pho_durs = np.array(centroid_pho_durs) / np.sum(centroid_pho_durs)
+            centroid_pho_durs *= duration_target
+
+            list_state_dur_path_centroid_pho_durs.append([state_dur_path, centroid_pho_durs.tolist()])
+
+        dict_query_phrase = \
+            {'list_state_dur_path_centroid_pho_durs': list_state_dur_path_centroid_pho_durs,
+             'query_phrase_name': query_phrase_name,
+             'lyrics_net': lyrics_net,
+             'posteri_probas': posteri_probas.tolist(),
+             'phrases': phrases,
+             'line_lyrics': line_lyrics
+             }
+
+    elif method == 'lyricsRecognizerHSMM':
+        # build matching network from the score dataset
+        phrases, \
+        lyrics_net, \
+        mat_trans_comb, \
+        state_pho_comb, \
+        index_start, \
+        index_end, \
+        list_centroid_pho_dur = makeHSMMNet(dict_score_100)
+
+        # calculate the mean duration of each phoneme (state) in the network
+        # this mean will be to generate gaussian duration distribution for each state.
+        mean_dur_state = []
+        for cpd in list_centroid_pho_dur:
+            cpd = np.array(cpd) / np.sum(cpd)
+            cpd *= duration_target
+            mean_dur_state += cpd.tolist()
+        # print mean_dur_state
+
+        hsmm = ParallelLRHSMM(lyrics_net,
+                              mat_trans_comb,
+                              state_pho_comb,
+                              index_start,
+                              index_end,
+                              mean_dur_state,
+                              proportionality_std)
+        if am == 'gmm':
+            hsmm._gmmModel(gmmModels_path)
+
+        # viterbi decoding
+        paths_hmm, posteri_probas = hsmm._viterbiHSMM(observations=mfcc_target, am=am, kerasModel=kerasModel)
+
+        # aggregate results for analysis
+        dict_query_phrase = \
+            {'query_phrase_name': query_phrase_name,
+             'lyrics_net': lyrics_net,
+             'posteri_probas': posteri_probas.tolist(),
+             'phrases': phrases,
+             'line_lyrics': line_lyrics}
+
+    return dict_query_phrase, query_phrase_name
+
+def generalProcess(method,
+                   proportionality_std=0,
+                   path_json_dict_query_phrases='dummy',
+                   am='gmm',
+                   files=()):
+
     ##-- method conditions
     if method == 'obsMatrix':
-        # gmmModel = gmmModelLoad()
+        # not used
         gmmModel = gmmPhoModelLoad()
-    elif method == 'lyricsRecognizerHMM':
-        path_json_dict_query_phrases = 'results/dict_query_phrases_' \
-                                       + method + '_' \
-                                       + class_name + '_'\
-                                       + am+dnn_node + '.json'
-        # print np.where(mat_trans_comb==1.0)
-        # print index_start
-    elif method == 'lyricsRecognizerHSMM':
-        path_json_dict_query_phrases = 'results/dict_query_phrases_' \
-                                       + method + '_' \
-                                       + class_name + '_'\
-                                       + am +dnn_node+ '_'\
-                                       + str(proportionality_std) + '.json'
     else:
+        gmmModel = ''
         pass
-        # dic_syllable_feature_train = loadMFCCTrain('dic_syllable_feature_train_'+class_name+'.pkl')
 
-    list_rank = []
+    if am=='cnn':
+        kerasModel = ParallelLRHMM.kerasModel(kerasModels_path)
+    else:
+        kerasModel = ''
+
     dict_query_phrases = {}
-    files = [filename for filename in getRecordingNamesSimi('TEST',class_name)]
-
+    # files = [filename for filename in getRecordingNamesSimi('TEST',class_name)]
 
     for filename in files:
         nestedPhonemeLists, _, _ = syllableTextgridExtraction(textgridDataDir, filename, 'line', 'details')
         sampleRate, wavData = wavfile.read(path.join(wavDataDir,filename+'.wav'))
         for i, line_list in enumerate(nestedPhonemeLists):
             print filename, i
-            # if filename != 'lsxp-Jiang_shen_er-San_jia_dian01-2-upf' or i != 5:
-            #     # bug in this file and this phrase
-            #     # stops in time 72
-            #     continue
 
-            # these phrases are not in score corpus
+            # these phrases are not in score dataset
             if (filename == 'lseh-Zi_na_ri-Hong_yang_dong-qm' and i in [4,5]) or \
                 (filename == 'lsxp-Huai_nan_wang-Huai_he_ying02-qm' and i in [0,1,2,3]):
                 continue
@@ -102,144 +268,24 @@ def generalProcess(method,proportionality_std,am='gmm',dnn_node=''):
             if filename == 'daxp-Jiao_Zhang_sheng-Hong_niang01-qm' and i in [3]:
                 continue
 
-            line = line_list[0]
-            start_frame = int(round(line[0]*sampleRate))
-            end_frame = int(round(line[1]*sampleRate))
-            line_lyrics = line[2]
+            dict_query_phrase, query_phrase_name = phraseProcess(filename,
+                                                      i,
+                                                      line_list,
+                                                      wavData,
+                                                      gmmModel,
+                                                      kerasModel,
+                                                      sampleRate,
+                                                      method,
+                                                      proportionality_std)
 
-            wav_line = wavData[start_frame:end_frame]
-            wavfile.write('temp.wav',sampleRate,wav_line)
-
-            # choose feature type as mfcc or mfccBands
-            if am == 'gmm':
-                mfcc_target     = processFeature('temp.wav',feature_type='mfcc')
-            elif am == 'dnn':
-                mfcc_target     = processFeature('temp.wav',feature_type='mfccBands')
-
-            N_frame         = mfcc_target.shape[0]
-            duration_target = (N_frame * hopsize_phoneticSimilarity) / float(sampleRate)
-
-            # only examine on the first N ranking results of melodic similarity
-            query_phrase_name = filename+'_'+str(i)
-            dict_score_100 = runDictScoreRankNFilter(dict_score,
-                                                     path_melodic_similarity_results,
-                                                     query_phrase_name,
-                                                     N=100)
-            # print 'dict_score_100 len:',len(dict_score_100)
-
-            if method == 'obsMatrix':
-                # obsM = obsMatrix(mfcc_target,gmmModel)    # syllable gmm
-                obsM = obsMatrixPho(mfcc_target,gmmModel)   # pho gmm
-                obsM = np.exp(obsM)
-                # obsM = obsM[1:,:]
-                obsM =  obsM/np.sum(obsM,axis=0)
-                print obsM
-            elif method == 'candidateSynthesizeData':
-                # choose the template which has the nearest length of the target mfcc
-                index_template = np.argmin(np.abs((np.array(list_N_frames)-N_frame)))
-                output = open('syllable_mfcc_templates/dic_mfcc_synthesized_'+str(list_N_frames[index_template])+'.pkl', 'r')
-                dic_mfcc_synthesized = pickle.load(output)
-                output.close()
-            elif method == 'lyricsRecognizerHMM':
-                phrases, lyrics_net, mat_trans_comb, state_pho_comb, index_start, index_end, list_centroid_pho_dur \
-                    = makeNet(dict_score_100)
-
-                hmm = ParallelLRHMM(lyrics_net,mat_trans_comb,state_pho_comb,index_start,index_end)
-                if am == 'gmm':
-                    hmm._gmmModel(gmmModels_path)
-
-                paths_hmm,posteri_probas = hmm._viterbiLog(observations=mfcc_target,am=am)
-                # best_match_lyrics = hmm._getBestMatchLyrics(path_hmm)
-                # print best_match_lyrics
-                # print paths_hmm
-                # print posteri_probas
-                list_state_dur_path_centroid_pho_durs = []
-                for ii_path in xrange(len(paths_hmm)):
-                    path_ii         = paths_hmm[ii_path]
-                    state_dur_path  = hmm._pathStateDur(path_ii)
-
-                    centroid_pho_durs = list_centroid_pho_dur[ii_path]
-                    centroid_pho_durs = np.array(centroid_pho_durs)/np.sum(centroid_pho_durs)
-                    centroid_pho_durs *= duration_target
-
-                    # states_decoded = [sdp[0] for sdp in state_dur_path]
-                    # durations_decoded = [sdp[1] for sdp in state_dur_path]
-
-                    # print states_decoded
-                    # print state_pho_comb[index_start[ii_path]:index_end[ii_path]+1]
-                    #
-                    # print durations_decoded
-                    # print centroid_pho_durs
-
-                    # total_duration_decoded_path = sum([sdp[1] for sdp in state_dur_path])
-                    # print duration_target, sum(centroid_pho_durs),total_duration_decoded_path
-
-                    list_state_dur_path_centroid_pho_durs.append([state_dur_path,centroid_pho_durs.tolist()])
-
-                dict_query_phrases[query_phrase_name] = \
-                        {'list_state_dur_path_centroid_pho_durs':list_state_dur_path_centroid_pho_durs,
-                        'query_phrase_name'                     :query_phrase_name,
-                        'lyrics_net'                            :lyrics_net,
-                        'posteri_probas'                        :posteri_probas.tolist(),
-                        'phrases'                               :phrases,
-                        'line_lyrics'                           :line_lyrics
-                        }
-
-
-                #
-                # with open(path_json_list_sdp_cpd,'r') as openfile:
-                #     list_state_dur_path_centroid_pho_durs = json.load(openfile)
-
-                #
-                # with open('results/lyricsRecognizer/'+query_phrase_name+'.json','w') as outfile:
-                #     json.dump(dict_out_lyricsReco,outfile)
-                # hmm._pathPlot([],[],path_hmm)
-
-                continue
-            elif method == 'lyricsRecognizerHSMM':
-                phrases, \
-                lyrics_net, \
-                mat_trans_comb, \
-                state_pho_comb, \
-                index_start, \
-                index_end, \
-                list_centroid_pho_dur = makeHSMMNet(dict_score_100)
-
-                # calculate the mean duration of each phoneme (state) in the network
-                # this mean will be to generate gaussian duration distribution for each state.
-                mean_dur_state =[]
-                for cpd in list_centroid_pho_dur:
-                    cpd = np.array(cpd)/np.sum(cpd)
-                    cpd *= duration_target
-                    mean_dur_state += cpd.tolist()
-                # print mean_dur_state
-                hsmm = ParallelLRHSMM(lyrics_net,
-                                      mat_trans_comb,
-                                      state_pho_comb,
-                                      index_start,
-                                      index_end,
-                                      mean_dur_state,
-                                      proportionality_std)
-                if am=='gmm':
-                    hsmm._gmmModel(gmmModels_path)
-
-                paths_hmm,posteri_probas = hsmm._viterbiHSMM(observations=mfcc_target,am=am)
-
-                dict_query_phrases[query_phrase_name] = \
-                    {'query_phrase_name':   query_phrase_name,
-                     'lyrics_net':          lyrics_net,
-                     'posteri_probas':      posteri_probas.tolist(),
-                     'phrases':             phrases,
-                     'line_lyrics':         line_lyrics}
+            dict_query_phrases[query_phrase_name] = dict_query_phrase
 
     with open(path_json_dict_query_phrases,'wb') as outfile:
         json.dump(dict_query_phrases,outfile)
 
-    # path_json_dict_query_phrases = 'results/dict_query_phrases_hmm_danAll.json'
-    # with open(path_json_dict_query_phrases,'w') as outfile:
-    #     json.dump(dict_query_phrases,outfile)
 
     '''
+    # below is reserved for experiment of obsMatrix and candidateSynthesizeData methods
             list_simi = []
             # best_dist = float('Inf')
             # best_M    = np.array([])

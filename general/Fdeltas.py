@@ -38,7 +38,7 @@ def Fdeltas(x,w=9):
     nr,nc = x.shape
 
     # Define window shape
-    hlen = np.floor(w/2)
+    hlen = int(np.floor(w/2))
     w = 2*hlen + 1
     win = np.arange(hlen,-hlen-1,-1)
 

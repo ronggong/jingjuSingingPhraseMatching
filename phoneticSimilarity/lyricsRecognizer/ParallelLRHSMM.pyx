@@ -1,3 +1,29 @@
+'''
+ * Copyright (C) 2017  Music Technology Group - Universitat Pompeu Fabra
+ *
+ * This file is part of jingjuSingingPhraseMatching
+ *
+ * pypYIN is free software: you can redistribute it and/or modify it under
+ * the terms of the GNU Affero General Public License as published by the Free
+ * Software Foundation (FSF), either version 3 of the License, or (at your
+ * option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+ * FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more
+ * details.
+ *
+ * You should have received a copy of the Affero GNU General Public License
+ * version 3 along with this program.  If not, see http://www.gnu.org/licenses/
+ *
+ * If you have any problem about this python version code, please contact: Rong Gong
+ * rong.gong@upf.edu
+ *
+ *
+ * If you want to refer this code, please use this article:
+ *
+'''
+
 import numpy as np
 from scipy.stats import norm
 import time
@@ -10,7 +36,7 @@ from LRHMM import _LRHMM
 from general.phonemeMap import *
 from general.parameters import *
 
-import os,sys
+# import os,sys
 # import json
 
 def transcriptionMapping(transcription):
@@ -73,16 +99,6 @@ class ParallelLRHSMM(_LRHMM):
         stateIn             *= -float('inf')
 
         # Set initial states distribution \pi %%%%            % PARAMETERs
-        # stateIn[:,0]        = np.log(self.pi)
-
-        # # simplify A
-        # A   = np.zeros((self.n,self.n),dtype=self.precision)
-        # for jj in xrange(self.n):
-        #     for ii in xrange(self.n):
-        #         if isinstance(self.A[ii][jj],np.ndarray):
-        #             A[ii][jj] = self.A[ii][jj][0]
-        #         else:
-        #             A[ii][jj] = self.A[ii][jj]
 
         return forwardDelta,\
                previousState,\
@@ -93,7 +109,13 @@ class ParallelLRHSMM(_LRHMM):
     @cython.cdivision(True)
     @cython.boundscheck(False)
     @cython.wraparound(False)
-    def _viterbiHSMM(self,observations,am='gmm'):
+    def _viterbiHSMM(self,observations,am='gmm',kerasModel=None):
+        """
+        HSMMs Viterbi decoding, from Guedon 2007 paper
+        :param observations:
+        :param am:
+        :return:
+        """
 
         forwardDelta,\
            previousState,\
@@ -111,10 +133,11 @@ class ParallelLRHSMM(_LRHMM):
         cdef int [:, ::1] coccupancy        = occupancy
 
         # calculate the observation probability and normalize for each frame into pdf sum(B_map[:,t])=1
-        if am=='gmm':
+        if am == 'gmm':
             self._mapBGMM(observations)
-        elif am == 'dnn':
-            self._mapBDNN(observations)
+        elif am == 'cnn':
+            # self._mapBDNN(observations)
+            self._mapBKeras(observations,kerasModel=kerasModel)
         # obs = np.exp(self.B_map)
         # obs /= np.sum(obs,axis=0)
 
@@ -153,19 +176,16 @@ class ParallelLRHSMM(_LRHMM):
         cdef double[:,::1] cD = D
 
         # version in guedon 2003 paper
-        for t in xrange(0,tau):
+        for t in range(0,tau):
             print t
             for j in xrange(self.n):
 
                 xsampa_state = self.transcription[j]
 
-                # print M_j
-                # print tau
-
                 observ          = 0.0
 
                 if t<tau-1:
-                    for u in xrange(1,min(t+1,cM[j])+1):
+                    for u in range(1,min(t+1,cM[j])+1):
                         observ += self.B_map[xsampa_state][t-u+1]
                         if u < t+1:
                             prod_occupancy = observ+cd[j][u]+cstateIn[j,t-u+1]
@@ -183,9 +203,7 @@ class ParallelLRHSMM(_LRHMM):
                                 coccupancy[j,t]      = t+1
 
                 else:
-                    for u in xrange(1,min(tau,cM[j])+1):
-                        # observ *= obs[j,tau-u]
-                        # observ += cobs[j,tau-u]
+                    for u in range(1,min(tau,cM[j])+1):
                         observ += self.B_map[xsampa_state][tau-u]
                         if u < tau:
                             prod_survivor = observ+cD[j][u]+cstateIn[j,tau-u]
@@ -205,8 +223,8 @@ class ParallelLRHSMM(_LRHMM):
             # ignore normalization
 
             if t<tau-1:
-                for j in xrange(self.n):
-                    for i in xrange(self.n):
+                for j in range(self.n):
+                    for i in range(self.n):
 
                         if cstateIn[j,t+1] < cA[i][j] + cforwardDelta[i,t]:
                             cstateIn[j,t+1]        = cA[i][j] + cforwardDelta[i,t]
@@ -214,17 +232,6 @@ class ParallelLRHSMM(_LRHMM):
 
 
         # termination: find the maximum probability for the entire sequence (=highest prob path)
-
-        # for i in xrange(self.n):
-        #     # decode only possible from the final node of each path
-        #     ii = i-1 if self.n > len(self.phos_final) else i
-        #     if ii in self.idx_final_tail: endingProb = np.log(1.0)
-        #     else: endingProb = np.log(0.0)
-        #
-        #     # print stateIn[i][len(observations)-1]
-        #     if (cmaxForward < cforwardDelta[i][tau-1]+endingProb):
-        #         cmaxForward = cforwardDelta[i][tau-1]+endingProb
-        #         cpath[tau-1] = i
 
         posteri_probs   = np.zeros((len(self.idx_final_tail),),dtype=self.precision)
         counter_posteri = 0
@@ -273,6 +280,20 @@ class ParallelLRHSMM(_LRHMM):
                 cpath[t-u] = cpreviousState[j,t]
             t = t-u
         '''
+
+        # avoid memory leaks
+        cA              = None
+        cforwardDelta   = None
+        cpreviousState  = None
+        cstate          = None
+        cstateIn        = None
+        coccupancy      = None
+
+        cpi             = None
+
+        cM              = None
+        cd              = None
+        cD              = None
 
         return paths,posteri_probs
 

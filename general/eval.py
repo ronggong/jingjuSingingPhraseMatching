@@ -25,6 +25,11 @@ def MRR(list_rank):
     return np.sum(1.0/np.array(list_rank))/len(list_rank)
 
 def topXhit(X,list_rank):
+    '''
+    :param X:
+    :param list_rank:
+    :return:
+    '''
     counter = 0
     for rank in list_rank:
         if rank <= X:

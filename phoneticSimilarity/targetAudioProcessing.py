@@ -1,9 +1,37 @@
+'''
+ * Copyright (C) 2017  Music Technology Group - Universitat Pompeu Fabra
+ *
+ * This file is part of jingjuSingingPhraseMatching
+ *
+ * pypYIN is free software: you can redistribute it and/or modify it under
+ * the terms of the GNU Affero General Public License as published by the Free
+ * Software Foundation (FSF), either version 3 of the License, or (at your
+ * option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+ * FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more
+ * details.
+ *
+ * You should have received a copy of the Affero GNU General Public License
+ * version 3 along with this program.  If not, see http://www.gnu.org/licenses/
+ *
+ * If you have any problem about this python version code, please contact: Rong Gong
+ * rong.gong@upf.edu
+ *
+ *
+ * If you want to refer this code, please use this article:
+ *
+'''
+
+# this file is reserved for other usage
+
 import essentia.standard as ess
 from essentia.streaming import *
 from general.parameters import *
 from general.filePath import *
 from sklearn import preprocessing
-from acousticModelTraining import getFeature,getMFCCBands
+from acousticModelTraining import getFeature,getMFCCBands1D,getMFCCBands2D,featureReshape
 import numpy as np
 import pickle
 from os import path
@@ -59,16 +87,26 @@ def mfccFeature_audio(filename_wav,index_keep,feature_type='mfcc'):
     audio               = ess.MonoLoader(downmix = 'left', filename = filename_wav, sampleRate = fs)()
     if feature_type == 'mfcc':
         feature             = getFeature(audio)
-    else:
-        feature             = getMFCCBands(audio)
-        # MFCC bands feature for dnn acoustic model needs to be scaled on mean and std
-        feature             = preprocessing.StandardScaler().fit_transform(feature)
+    elif feature_type == 'mfccBands1D':
+        feature             = getMFCCBands1D(audio)
+    elif feature_type == 'mfccBands2D':
+        feature             = getMFCCBands2D(audio,nbf=True)
+
+    if feature_type == 'mfccBands1D' or feature_type == 'mfccBands2D':
+        feature             = np.log(100000 * feature + 1)
+        scaler = pickle.load(open(kerasScaler_path,'rb'))
+        feature = scaler.transform(feature)
+
     # feature             = preprocessing.StandardScaler().fit_transform(feature)
-    index_keep          = pitchProcessing_audio(filename_wav)
+    # index_keep          = pitchProcessing_audio(filename_wav)
     feature_out         = feature[index_keep[0],:]
 
     for index in index_keep[1:]:
         feature_out = np.vstack((feature_out,feature[index,:]))
+
+    if feature_type == 'mfccBands2D':
+        feature_out = featureReshape(feature_out)
+
     return feature_out
 
 def gmmModelLoad():

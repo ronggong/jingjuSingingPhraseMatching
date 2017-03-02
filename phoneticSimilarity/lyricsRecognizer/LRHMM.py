@@ -1,3 +1,29 @@
+'''
+ * Copyright (C) 2017  Music Technology Group - Universitat Pompeu Fabra
+ *
+ * This file is part of jingjuSingingPhraseMatching
+ *
+ * pypYIN is free software: you can redistribute it and/or modify it under
+ * the terms of the GNU Affero General Public License as published by the Free
+ * Software Foundation (FSF), either version 3 of the License, or (at your
+ * option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+ * FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more
+ * details.
+ *
+ * You should have received a copy of the Affero GNU General Public License
+ * version 3 along with this program.  If not, see http://www.gnu.org/licenses/
+ *
+ * If you have any problem about this python version code, please contact: Rong Gong
+ * rong.gong@upf.edu
+ *
+ *
+ * If you want to refer this code, please use this article:
+ *
+'''
+
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
@@ -9,9 +35,10 @@ import pickle,cPickle,gzip
 import numpy as np
 import matplotlib.pyplot as plt
 
+from keras.models import load_model
+
 from general.parameters import *
-from general.phonemeMap import dic_pho_label_inv
-from general.filePath import dnnModels_base_path,dnnModels_cfg_path,dnnModels_param_path
+from general.phonemeMap import dic_pho_label_inv, dic_pho_label
 
 current_folder = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.join(current_folder,"..","gmmModels"))
@@ -78,45 +105,43 @@ class _LRHMM(object):
 
             # for t in xrange(dim_t):
             #     self.B_map[state][t] = logprob[t]
-    def _mapBDNN(self, observations):
+
+
+    @staticmethod
+    def kerasModel(kerasModels_path):
+        kerasModel = load_model(kerasModels_path)
+        return kerasModel
+
+    def _mapBKeras(self, observations, kerasModel):
         '''
         dnn observation probability
         :param observations:
         :return:
         '''
-        ##-- save the feature to pickle
-        label = np.array([0] * len(observations))
-        filename_feature_temp       = os.path.join(dnnModels_base_path,'feature_temp.pickle.gz')
-        filename_observation_temp   = os.path.join(dnnModels_base_path,'observation_temp.pickle.gz')
-
-        with gzip.open(filename_feature_temp, 'wb') as f:
-            cPickle.dump((observations, label), f)
-
         ##-- set environment of the pdnn
-        myenv = os.environ
-        myenv['PYTHONPATH'] = '/Users/gong/Documents/pycharmProjects/pdnn'
 
-        from subprocess import call
+        observations_concat = [observations, observations, observations, observations, observations, observations]
 
         ##-- call pdnn to calculate the observation from the features
-        call(["/usr/local/bin/python", "/Users/gong/Documents/pycharmProjects/pdnn/cmds/run_Extract_Feats.py", "--data",
-              filename_feature_temp,
-              "--nnet-param", dnnModels_param_path, "--nnet-cfg", dnnModels_cfg_path,
-              "--output-file", filename_observation_temp, "--layer-index", "-1",
-              "--batch-size", "256"], env=myenv)
+        obs = kerasModel.predict_proba(observations_concat, batch_size=128,verbose=0)
+
 
         ##-- read the observation from the output
-        with gzip.open(filename_observation_temp, 'rb') as f:
-            obs = cPickle.load(f)
 
         obs = np.log(obs)
 
         # print obs.shape, observations.shape
 
+        dim_t       = obs.shape[0]
+        self.B_map  = np.zeros((self.n, dim_t), dtype=self.precision)
+        # print self.transcription, self.B_map.shape
+        # for ii,state in enumerate(self.transcription):
+        #     self.B_map[ii,:] = obs[:, dic_pho_label[state]]
+
         self.B_map = {}
         # print self.transcription, self.B_map.shape
         for ii in xrange(obs.shape[1]):
-            self.B_map[dic_pho_label_inv[ii]] = obs[:,ii]
+            self.B_map[dic_pho_label_inv[ii]] = obs[:, ii]
 
     def _viterbi(self, observations):
         '''
