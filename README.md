@@ -15,13 +15,13 @@ The related code only situated in **phoneticSimilarity** folder. Other folders a
 python setup.py build_ext --inplace
 ```
 5. Install dependencies (see below)
-6. Choose `class_name` in `general/filePath.py` to `danAll` or `laosheng` to experiment on either dan or laosheng role-type
-7. Choose `am ` in `general/parameters.py` to `gmm` or `cnn` to select acoustic model
+6. Choose `class_name` in `general/filePath.py` to `'danAll'` or `'laosheng'` to experiment on either dan or laosheng role-type
+7. Choose `am ` in `general/parameters.py` to `'gmm'` or `'cnn'` to select acoustic model
 8. Run `python runHMM.py` to produce the experiment results for HMM and post-processor duration modelling matching
 9. Run `python runHSMM.py` to produce the experiment results for HSMM duration modelling matching
 10. The details instructions are written in these two files above
 
-## Step to train GMM, CNN acoustic models
+## Steps to train GMM, CNN acoustic models
 1. Do steps 1, 2, 3 in **Steps to reproduce the experiment results**
 2. To train GMM models, run `python acousticModelTraining.py`
 3. To train CNN acoustic models, please follow the instructions in https://github.com/ronggong/EUSIPCO2017
