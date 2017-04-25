@@ -22,7 +22,7 @@ The related code only situated in **phoneticSimilarity** folder. Other folders a
 1. Do steps 1, 2, 3 in **Steps to reproduce the experiment results**
 2. To train GMM models, run `python acousticModelTraining.py`
 3. To train CNN acoustic models, please follow the instructions in https://github.com/ronggong/EUSIPCO2017
-4. After training CNN models, put them cnnModels folders. Pre-trained models are already included.
+4. After training CNN models, put them into cnnModels folders. Pre-trained models are already included.
 
 ## Dependencies
 `numpy scipy matplotlib essentia vamp scikit-learn pinyin cython keras theano unicodecsv`
