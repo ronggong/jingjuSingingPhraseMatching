@@ -1,6 +1,6 @@
 # Jingju Singing Phrase Matching
 The code in this repo aims to help reproduce the results in the work:
->Matching singing phrase audio to score by combining phonetic and duration information
+>Rong Gong, Jordi Pons, and Xavier Serra. 2017.  Audio to Score Matching by Combining Phonetic and Duration Information. In 18th International Society for Music Information Retrieval Conference. Suzhou, China
 
 The objective of this research task to find the corresponding score for its singing query audio. By pre-segmenting both the singing audios and the music scores into the phrase units, we restrict this research to the "matching" scope. The matched scores could facilitate several lower-level MIR tasks, such as the score-informed automatic syllable or phoneme segmentation for singing voice.
 
@@ -11,7 +11,7 @@ The related code only situated in **phoneticSimilarity** folder. Other folders a
 2. Download Jingju a capella singing dataset from http://doi.org/10.5281/zenodo.344932
 3. Change `dataset_path` variable in `general/filePath.py` to locate the above dataset
 4. Compile cython viterbi decoding code: go into `CythonModule`, in terminal type `python setup.py build_ext --inplace`
-5. Install dependencies (see below)
+5. Python 2.7.9 and Essentia 2.1-beta 3 were used in the paper; Install dependencies in `requirements.txt`
 6. Choose `class_name` in `general/filePath.py` to `'danAll'` or `'laosheng'` to experiment on either dan or laosheng role-type
 7. Choose `am ` in `general/parameters.py` to `'gmm'` or `'cnn'` to select acoustic model
 8. Run `python runHMM.py` to produce the experiment results for HMM and post-processor duration modelling matching
